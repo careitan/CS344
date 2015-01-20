@@ -1,26 +1,19 @@
-# CS 344 Homework 1
-# (Craig) Allan Reitan
-
-#Validate Arguments
-$CMD=$1;
-$FILE=$2;
-
-$ERR=0;
-
-#set an error flag if any fundamental requirements are not met.
-if [ ($CMD -ne "-r" || $CMD -ne "-c") ]; then
-  $ERR=1;
-elif [ $FILE -eq "" ]; then
-  $ERR=1;
-elif ["$3" -ne ""]; then
-  $ERR=1;
-fi
-
-#take action based on input conditions.
-if [ $ERR -eq 1 ]; then
-  echo "Usage: stats {-rows|-cols} [file]";
+#!/bin/sh
+c=$1
+f=$2
+e=0
+if [[ $c -ne "-r" || $c -ne "-c" ]]; then
+  $e=1
+elif [[ -z "$f" ]]; then
+  $e=1
+elif [[ -z "$3" ]]; then
+  $e=1
 else
-  echo "Hello World";
+  $e=1
 fi
-
+if [[ $e -eq 1 ]]; then
+  echo "Usage: stats {-rows|-cols} [file]"
+else
+  echo "Hello World"
+fi
 exit
