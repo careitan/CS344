@@ -3,7 +3,9 @@ set -x
 c=$( echo $1 | cut -c -2 )
 f=$2
 e=0
-if [[ $c -ne "-r" || $c -ne "-c" ]]; then
+if [[ $c -ne "-r" ]]; then
+  e=1
+elif [[ $c -ne "-c" ]]; then
   e=1
 elif [[ -z "$f" ]]; then
   e=1
@@ -40,24 +42,24 @@ do
   else
     #http://forum.linuxcareer.com/threads/1645-Calculate-column-average-using-bash-shell
     columns=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
-    # for (( i = 1; i <= columns; i++ )); do
-    #   avg=0
-    #   median=0
-    #   for j in $( awk '{ print $i; }' $f ); do
-    #     avg=$(echo $avg+$i|bc )
-    #     median=$( echo $median " " $i )
-    #     number++
-    #   done
-    #   avg=$(echo "scale=0;$avg/$number" | bc)
-    #   median=$( echo $median|sed -e 's/ /\n/g'|sort -n )
-    #   if [[ $( expr $number % 2 ) -ne 0 ]]; then
-    #     median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) + 1 ) )
-    #   else
-    #     median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) ) )
-    #   fi
-    #   avgList=$( echo -e $avgList "   " $avg )
-    #   medianList=$( echo -e $medianList "   " $median )
-    # done
+    for (( i = 1; i <= columns; i++ )); do
+      avg=0
+      median=0
+      for j in $( awk '{ print $i; }' $f ); do
+        avg=$(echo $avg+$i|bc )
+        median=$( echo $median " " $i )
+        number++
+      done
+      avg=$(echo "scale=0;$avg/$number" | bc)
+      median=$( echo $median|sed -e 's/ /\n/g'|sort -n )
+      if [[ $( expr $number % 2 ) -ne 0 ]]; then
+        median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) + 1 ) )
+      else
+        median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) ) )
+      fi
+      avgList=$( echo -e $avgList "   " $avg )
+      medianList=$( echo -e $medianList "   " $median )
+    done
   fi
 done<$f
 if [[ $c == "-c" ]]; then
