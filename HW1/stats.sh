@@ -59,8 +59,11 @@ do
     #   medianList=$( echo -e $medianList "   " $median )
     # done
   fi
-done
+done<$f
 if [[ $c -eq "-c" ]]; then
-  echo -e "Averages:\n$avgList\nMedians:\nmedianList\n"
-fi<$f
+  echo -e "Averages:\n$avgList\nMedians:\n$medianList\n"
+  exit 0
+else
+  exit 0
+fi
 exit 0
