@@ -30,8 +30,7 @@ do
   if [[ $c -eq "-r" ]]; then
     median=$( echo $myLine|sed -e 's/ /\n/g'|sort -n )
     number=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
-    avg=$( expr `echo $myLine | sed -e 's/ / + /g'` )
-    avg=$(echo "scale=2;$avg/$number" | bc)
+    avg=$( expr `echo $myLine | sed -e 's/ / + /g' -e "s,$, \) / $number," -e "s/^/\( /"` )
     if [[ $( expr $number % 2 ) -ne 0 ]]; then
       median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) + 1 ) )
     else
@@ -49,7 +48,7 @@ do
     #     median=$( echo $median " " $i )
     #     number++
     #   done
-    #   avg=$(echo "scale=2;$avg/$number" | bc)
+    #   avg=$(echo "scale=0;$avg/$number" | bc)
     #   median=$( echo $median|sed -e 's/ /\n/g'|sort -n )
     #   if [[ $( expr $number % 2 ) -ne 0 ]]; then
     #     median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) + 1 ) )
