@@ -22,8 +22,8 @@ fi
 linecount=1
 number=0
 avg=0
-avgList=""
-medianList=""
+avgList=0
+medianList=0
 median=0
 if [[ $c -eq "-r" ]]; then
   echo "Average Median"
