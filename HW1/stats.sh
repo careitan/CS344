@@ -22,8 +22,8 @@ fi
 linecount=1
 number=0
 avg=0
-avgList
-medianList
+avgList=""
+medianList=""
 median=0
 if [[ $c -eq "-r" ]]; then
   echo "Average Median"
@@ -40,28 +40,27 @@ do
       median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) ) )
     fi
     echo -e "$avg \t $median"
-  else
-    #http://forum.linuxcareer.com/threads/1645-Calculate-column-average-using-bash-shell
-    columns=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
-    for (( i = 1; i <= columns; i++ )); do
-      avg=0
-      median=0
-      for j in $( awk '{ print $i; }' $f ); do
-        avg=$(echo $avg+$i|bc )
-        median=$( echo $median " " $i )
-        number++
-      done
-      avg=$(echo "scale=2;$avg/$number" | bc)
-      median=$( echo $median|sed -e 's/ /\n/g'|sort -n )
-      if [[ $( expr $number % 2 ) -ne 0 ]]; then
-        median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) + 1 ) )
-      else
-        median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) ) )
-      fi
-      avgList=$( echo -e $avgList "   " $avg )
-      medianList=$( echo -e $medianList "   " $median )
-    done
-
+  # else
+  #   #http://forum.linuxcareer.com/threads/1645-Calculate-column-average-using-bash-shell
+  #   columns=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
+  #   for (( i = 1; i <= columns; i++ )); do
+  #     avg=0
+  #     median=0
+  #     for j in $( awk '{ print $i; }' $f ); do
+  #       avg=$(echo $avg+$i|bc )
+  #       median=$( echo $median " " $i )
+  #       number++
+  #     done
+  #     avg=$(echo "scale=2;$avg/$number" | bc)
+  #     median=$( echo $median|sed -e 's/ /\n/g'|sort -n )
+  #     if [[ $( expr $number % 2 ) -ne 0 ]]; then
+  #       median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) + 1 ) )
+  #     else
+  #       median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) ) )
+  #     fi
+  #     avgList=$( echo -e $avgList "   " $avg )
+  #     medianList=$( echo -e $medianList "   " $median )
+  #   done
   fi
 done
 if [[ $c -eq "-c" ]]; then
