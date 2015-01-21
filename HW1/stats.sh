@@ -45,10 +45,10 @@ do
     for (( i = 1; i <= columns; i++ )); do
       avg=0
       median=0
-      for j in $( awk '{ print $i; }' $f ); do
-        avg=$(echo $avg+$i|bc )
-        median=$( echo $median " " $i )
-        number++
+      for j in $( echo awk '{ print $i; }' $f ); do
+        avg=$(echo $avg+$j|bc )
+        median=$( echo $median " " $j )
+        number=$[$number + 1]
       done
       avg=$(echo "scale=0;$avg/$number" | bc)
       median=$( echo $median|sed -e 's/ /\n/g'|sort -n )
