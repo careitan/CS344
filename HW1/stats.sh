@@ -1,5 +1,5 @@
 #!/bin/sh
-set -x
+#set -x
 c=$( echo $1 | cut -c -2 )
 f=$2
 e=0
@@ -30,7 +30,8 @@ do
   if [[ $c -eq "-r" ]]; then
     median=$( echo $myLine|sed -e 's/ /\n/g'|sort -n )
     number=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
-    avg=$( expr `echo $myLine | sed -e 's/ / + /g' -e "s,$, \) / $number," -e "s/^/\( /"` )
+    avg=$( expr `echo $myLine | sed -e 's/ / + /g'` )
+    avg=$(echo "scale=2;$avg/$number" | bc)
     if [[ $( expr $number % 2 ) -ne 0 ]]; then
       median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) + 1 ) )
     else
@@ -61,7 +62,7 @@ do
   fi
 done<$f
 if [[ $c -eq "-c" ]]; then
-  echo -e "Averages:\n$avgList\nMedians:\n$medianList\n"
+  echo -e "Averages:\n\n$avgList\n\nMedians:\n\n$medianList\n"
   exit 0
 else
   exit 0
