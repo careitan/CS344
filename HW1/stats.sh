@@ -27,9 +27,9 @@ median=0;medianList=0
 if [[ $c == "-r" ]]; then
   echo "Average Median"
 fi
-while read myLine
-do
-  if [[ $c == "-r" ]]; then
+if [[ $c == "-r" ]]; then
+  while read myLine
+  do
     median=$( echo $myLine|sed -e 's/ /\n/g'|sort -n )
     number=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
     avg=$( expr `echo $myLine | sed -e 's/ / + /g' -e "s,$, \) / $number," -e "s/^/\( /"` )
@@ -39,14 +39,18 @@ do
       median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) ) )
     fi
     echo -e "$avg \t $median"
-  else
+  done<$f
+else
+  while read myLine
+  do
     #http://forum.linuxcareer.com/threads/1645-Calculate-column-average-using-bash-shell
     columns=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
     for (( i = 1; i <= columns; i++ )); do
       avg=0
       median=0
-      for j in $( echo awk '{ print $i; }' $f ); do
-        avg=$(echo $avg+$j|bc )
+      number=0
+      for j in $( echo "awk '{ print $i; }' $f" ); do
+        avg=$(echo $avg+$j| bc )
         median=$( echo $median " " $j )
         number=$[$number + 1]
       done
@@ -60,12 +64,8 @@ do
       avgList=$( echo -e $avgList "   " $avg )
       medianList=$( echo -e $medianList "   " $median )
     done
-  fi
-done<$f
-if [[ $c == "-c" ]]; then
+  done<$f
   echo -e "Averages:\n\n$avgList\n\nMedians:\n\n$medianList\n"
-  exit 0
-else
   exit 0
 fi
 exit 0
