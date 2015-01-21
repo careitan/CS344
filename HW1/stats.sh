@@ -23,7 +23,7 @@ if [[ $e -eq 1 ]]; then
 fi
 linecount=1;number=0
 avg=0;avgList=0
-median=0;medianList=0
+median='';medianList=0
 if [[ $c == "-r" ]]; then
   echo "Average Median"
 fi
@@ -50,9 +50,10 @@ else
       median=0
       number=0
 
-      for j in $( awk '{ print \$$i; }' $f ); do
-        avg=$(echo $avg+$j| bc )
-        median=$( echo $median " " $j )
+      #for j in $( awk '{ print \$$i; }' $f ); do
+      cat $f|awk '{print $i}'|while read col1; do
+        avg=$(echo $avg+$col1| bc )
+        median=$( echo $median " " $col1 )
         number=$[$number + 1]
       done
       avg=$(echo "scale=0;$avg/$number" | bc)
