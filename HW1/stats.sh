@@ -19,12 +19,9 @@ if [[ $e -eq 1 ]]; then
   echo "Usage: stats {-rows|-cols} [file]"
   exit 1
 fi
-linecount=1
-number=0
-avg=0
-avgList=0
-medianList=0
-median=0
+linecount=1;number=0
+avg=0;avgList=0
+median=0;medianList=0
 if [[ $c -eq "-r" ]]; then
   echo "Average Median"
 fi
@@ -40,9 +37,9 @@ do
       median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) ) )
     fi
     echo -e "$avg \t $median"
-  # else
-  #   #http://forum.linuxcareer.com/threads/1645-Calculate-column-average-using-bash-shell
-  #   columns=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
+  else
+    #http://forum.linuxcareer.com/threads/1645-Calculate-column-average-using-bash-shell
+    columns=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
   #   for (( i = 1; i <= columns; i++ )); do
   #     avg=0
   #     median=0
@@ -60,12 +57,10 @@ do
   #     fi
   #     avgList=$( echo -e $avgList "   " $avg )
   #     medianList=$( echo -e $medianList "   " $median )
-  #   done
+    done
   fi
 done
 if [[ $c -eq "-c" ]]; then
   echo -e "Averages:\n$avgList\nMedians:\nmedianList\n"
-fi
-
-<$f
+fi<$f
 exit 0
