@@ -110,12 +110,13 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
     file = RoomFilePath(dirRooms, Room);
     printf("DEBUG char* file set to: %s\n", file);
 
-    strcpy(buf,"ROOM NAME: ");
-    strcat(buf,arrRooms[i]);
-
-    fd = open(file, O_RDWR | O_CREAT, 777);
+    fd = open(file, O_RDWR | O_CREAT, 0777);
     printf("DEBUG fd set to: %d\n", fd);
-
+    
+    strcpy(buf,"");
+    strcat(buf,"ROOM NAME: ");
+    strcat(buf,arrRooms[i]);
+    
     if (fd == -1){
       fprintf(stderr, "Could not open the new file %s\n", file);
     }else{
