@@ -97,7 +97,7 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
   char* newDir;
   strcpy(newDir,"");
   strcat(newDir,dirRooms);
-  printf("DEBUG newDir set to: %s\n", newDir);
+  //printf("DEBUG newDir set to: %s\n", newDir);
 
   mkdir(newDir, 0777);
   //mkdir(newDir, DIR_PERMS);
@@ -113,13 +113,12 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
     fd = open(file, O_RDWR | O_CREAT, 0777);
     printf("DEBUG fd set to: %d\n", fd);
     
-    strcpy(buf,"");
-    strcat(buf,"ROOM NAME: ");
-    strcat(buf,arrRooms[i]);
-    
     if (fd == -1){
       fprintf(stderr, "Could not open the new file %s\n", file);
     }else{
+      strcpy(buf,"");
+      strcat(buf,"ROOM NAME: ");
+      strcat(buf,arrRooms[i]);
       numWrite = write(fd, buf, BUF_SIZE);
       close(fd);
     }
