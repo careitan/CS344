@@ -13,6 +13,8 @@
 #ifndef BUF_SIZE
 #define BUF_SIZE 1024
 #endif
+#define DIR_PERMS (S_IRWXU|S_IRWXG|S_IRWXO)
+#define FILE_PERMS (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)
 
 // Function definitions
 void Introduction();
@@ -59,7 +61,6 @@ int main()
   Introduction();
 
 
-
   return 0;
 }
 
@@ -94,7 +95,13 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
   char buf[BUF_SIZE];
 
   // Make the initial root directory for this program iteration run.
-  mkdir(dirRooms, 777);
+  char* newDir;
+  strcpy(newDir,"~/");
+  strcat(newDir,dirRooms);
+  //printf("DEBUG newDir set to: %s\n", newDir);
+
+  //mkdir(newDir, 777);
+  mkdir(newDir, DIR_PERMS);
 
   for (i = 0; i < 7; ++i)
   {
@@ -107,7 +114,7 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
     strcpy(buf,"ROOM NAME: ");
     strcat(buf,arrRooms[i]);
 
-    fd = open(file, O_RDWR|O_CREAT,777);
+    fd = open(file, O_RDWR | O_CREAT, 777);
     printf("DEBUG fd set to: %d\n", fd);
 
     if (fd == -1){
@@ -169,7 +176,7 @@ char* RoomFilePath(char* dirRooms, const char* strRoom)
 {
   char* RetVal;
   strcpy(RetVal,"");
-  strcat(RetVal,"/");
+  strcat(RetVal,"~/");
   strcat(RetVal,dirRooms);
   strcat(RetVal,"/");
   strcat(RetVal,strRoom);
