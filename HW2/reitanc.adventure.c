@@ -60,7 +60,6 @@ int main()
   // Begin the Game for the user.
   Introduction();
 
-
   return 0;
 }
 
@@ -98,10 +97,10 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
   char* newDir;
   strcpy(newDir,"~/");
   strcat(newDir,dirRooms);
-  //printf("DEBUG newDir set to: %s\n", newDir);
+  printf("DEBUG newDir set to: %s\n", newDir);
 
-  //mkdir(newDir, 777);
-  mkdir(newDir, DIR_PERMS);
+  mkdir(newDir, 0777);
+  //mkdir(newDir, DIR_PERMS);
 
   for (i = 0; i < 7; ++i)
   {
@@ -114,7 +113,7 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
     strcpy(buf,"ROOM NAME: ");
     strcat(buf,arrRooms[i]);
 
-    fd = open(file, O_RDWR | O_CREAT, 777);
+    fd = open(file, O_RDWR | O_CREAT, 0777);
     printf("DEBUG fd set to: %d\n", fd);
 
     if (fd == -1){
