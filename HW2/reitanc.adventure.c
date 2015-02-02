@@ -93,11 +93,11 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
   for (int i = 0; i < 7; ++i)
   {
     // Initially create all the files that we will be using.
-    char file[];
-    strcat(file,"/");
-    strcat(file,dirRooms);
-    strcat(file,"/");
-    strcat(file,arrRooms[i]);
+    char file[] = RoomFilePath(dirRooms, arrRooms[i]);
+    // strcat(file,"/");
+    // strcat(file,dirRooms);
+    // strcat(file,"/");
+    // strcat(file,arrRooms[i]);
 
     strcpy(buf,"ROOM NAME: ");
     strcat(buf,arrRooms[i]);
@@ -106,7 +106,8 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
     if (fd == -1){
       errExit("open");
     }else {
-
+      numWrite = write(fd, buf, BUF_SIZE);
+      close(fd);
     }
   }
 
