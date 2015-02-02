@@ -11,7 +11,7 @@
 #include <fcntl.h>
 
 #ifndef BUF_SIZE
-#define BUF_SIZE 1024
+#define BUF_SIZE 512
 #endif
 #define DIR_PERMS (S_IRWXU|S_IRWXG|S_IRWXO)
 #define FILE_PERMS (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)
@@ -19,9 +19,9 @@
 // Function definitions
 void Introduction();
 int RoomConnections();
-void GenerateRooms(char* dirRooms, const char* arrRooms[]);
+void GenerateRooms(char* dirRooms, char* arrRooms[]);
 void LoadRoomNames(char* arrRooms[]);
-char* RoomFilePath(char* dirRooms, const char* strRoom);
+char* RoomFilePath(char* dirRooms, char* strRoom);
 
 // Struct definition
 struct Room {
@@ -51,7 +51,7 @@ int main()
   strcpy(dirRoom, dirRoomBase);
   strcat(dirRoom, dirPid);
 
-  const char* roomNames[]={"Diablo", "Crypt", "Rivendell", "Skyrim", "Morrowind", 
+  char* roomNames[]={"Diablo", "Crypt", "Rivendell", "Skyrim", "Morrowind", 
   "Destiny-SGU", "Transporter"};
 
   // Generate the game content.
@@ -81,7 +81,7 @@ int RoomSelector()
   return (rand() % 7);
 }
 
-void GenerateRooms(char* dirRooms, const char* arrRooms[])
+void GenerateRooms(char* dirRooms, char* arrRooms[])
 {
   // printf("DEBUG: dirRoom is %s\n", dirRooms);
   ssize_t numRead;
@@ -107,9 +107,13 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
   for (i = 0; i < 7; ++i)
   {
     // Initially create all the files that we will be using.
-    const char* Room = arrRooms[i];
+    printf("DEBUG arrRooms[i] set to: %s\n", arrRooms[i]);
+    char* Room = arrRooms[i];
     char* file;
-    file = RoomFilePath(dirRooms, Room);
+    strcpy(file,"");
+    strcat(file,RoomFilePath(dirRooms, Room));
+    
+    //file = RoomFilePath(dirRooms, Room);
     printf("DEBUG char* file set to: %s\n", file);
 
     // File Pointer Method.
@@ -184,16 +188,17 @@ void LoadRoomNames(char* arrRooms[])
 
 }
 
-char* RoomFilePath(char* dirRooms, const char* strRoom)
+char* RoomFilePath(char* dirRooms, char* strRoom)
 {
   char* RetVal;
+  //printf("DEBUG Inside the RoomFilePath function.\n");
   strcpy(RetVal,"");
-  //strcat(RetVal,"~/");
-  strcat(RetVal,"/");
+  strcat(RetVal,"~/");
+  //strcat(RetVal,"/");
   strcat(RetVal,dirRooms);
   strcat(RetVal,"/");
   strcat(RetVal,strRoom);
   strcat(RetVal,".txt");
-
+  //printf("DEBUG Exiting the RoomFilePath function.\n");
   return RetVal; 
 }
