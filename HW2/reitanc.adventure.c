@@ -25,9 +25,18 @@ main()
   srand(1000);
 
   // Initialize variables
+  const char* dirRoomBase = "reitanc.rooms.";
+  char dirPid[16];
+  int procPid = getpid();
+  sprintf(dirPid, "%u", procPid);
+
+  char* dirRoom;
+  dirRoom = malloc(strlen(dirRoomBase) + strlen(dirPid) + 1);
+  strcpy(dirRoom, dirRoomBase);
+  strcat(dirRoom, dirPid);
 
   // Generate the game content.
-  GenerateRooms();
+  GenerateRooms(dirRoom);
 
   // Begin the Game for the user.
   Introduction();
@@ -48,20 +57,11 @@ int RoomConnections()
   return (rand() % 4) + 3;
 }
 
-void GenerateRooms()
+void GenerateRooms(char* dirRooms)
 {
-  const char* dirRoomBase = "reitanc.rooms.";
-  int procid = getpid();
-  char* dirPid;
-  dirPid = malloc(strlen((char)procid)+1);
-  strcpy(dirPid, (char)procid);
+  // printf("DEBUG: dirRoom is %s\n", dirRooms);
 
-  char* dirRoom;
-  dirRoom = malloc(strlen(dirRoomBase) + strlen(dirPid) + 1);
-  strcpy(dirRoom, dirRoomBase);
-  strcat(dirRoom, dirPid);
 
-  printf("DEBUG: dirRoom is %s\n", dirRoom);
 
   return ;
 }
