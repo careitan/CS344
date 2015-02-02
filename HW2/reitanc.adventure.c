@@ -18,7 +18,7 @@ void Introduction();
 int RoomConnections();
 void GenerateRooms(char* dirRooms, const char* arrRooms[]);
 void LoadRoomNames(char* arrRooms[]);
-char[] RoomFilePath(char* dirRooms, char* strRoom);
+char* RoomFilePath(char* dirRooms, const char* strRoom);
 
 // Struct definition
 struct Room {
@@ -88,12 +88,17 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
   
   mode_t filePerms;
 
+  int fd;
+
   char buf[BUF_SIZE];
 
   for (int i = 0; i < 7; ++i)
   {
     // Initially create all the files that we will be using.
-    char file[] = RoomFilePath(dirRooms, arrRooms[i]);
+    const char* Room = arrRooms[i];
+    char* file;
+    file = RoomFilePath(dirRooms, Room);
+    printf("DEBUG char* file set to: %s\n", file);
     // strcat(file,"/");
     // strcat(file,dirRooms);
     // strcat(file,"/");
@@ -104,7 +109,6 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
 
     fd = open(file, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (fd == -1){
-      errExit("open");
     }else {
       numWrite = write(fd, buf, BUF_SIZE);
       close(fd);
@@ -113,17 +117,17 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
 
   for (int i = 0; i < 7; ++i)
   {
-    switch(i){
-      case 0:
-      // Start_room
-        break;
-      case 6:
-      // End_room
-        break;
-      case default:
-      // MID_ROOM
-        break;
-      }
+    // switch(i){
+    //   case 0:
+    //   // Start_room
+    //     break;
+    //   case 6:
+    //   // End_room
+    //     break;
+    //   case default:
+    //   // MID_ROOM
+    //     break;
+    //   }
   }
 
   return ;
@@ -155,10 +159,11 @@ void LoadRoomNames(char* arrRooms[])
 
 }
 
-char[] RoomFilePath(char* dirRooms, char* strRoom)
+char* RoomFilePath(char* dirRooms, const char* strRoom)
 {
-  char RetVal[];
-  strcat(RetVal,"/");
+  char* RetVal;
+  strcpy(RetVal,"");
+  //strcat(RetVal,"/");
   strcat(RetVal,dirRooms);
   strcat(RetVal,"/");
   strcat(RetVal,strRoom);
