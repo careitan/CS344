@@ -95,7 +95,7 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
 
   // Make the initial root directory for this program iteration run.
   char* newDir;
-  strcpy(newDir,"~/");
+  strcpy(newDir,"");
   strcat(newDir,dirRooms);
   printf("DEBUG newDir set to: %s\n", newDir);
 
@@ -113,7 +113,7 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
     strcpy(buf,"ROOM NAME: ");
     strcat(buf,arrRooms[i]);
 
-    fd = open(file, O_RDWR | O_CREAT, 0777);
+    fd = open(file, O_RDWR | O_CREAT, 777);
     printf("DEBUG fd set to: %d\n", fd);
 
     if (fd == -1){
