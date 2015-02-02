@@ -3,7 +3,13 @@
 */
 
 #include <stdio.h>
+#include <iostream.h>
 #include <string.h>
+#include <cstring.h>
+#include <cstdlib.h>
+#include <vector.h>
+#include <iterator.h>
+using namespace std;
 
 // Function definitions
 void Introduction();
@@ -11,12 +17,13 @@ void Introduction();
 // Struct definition
 struct Room()
 {
-  
+
 };
 
 main()
 {
-  /* code */
+  // Initialize variables
+  vector<string> travel; // used to keep track of the steps that were taken.
 
 
 
