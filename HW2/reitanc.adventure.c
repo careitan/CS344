@@ -6,26 +6,33 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#ifndef BUF_SIZE
+#define BUF_SIZE 1024
+#endif
 
 // Function definitions
 void Introduction();
 int RoomConnections();
-void GenerateRooms(char* dirRooms);
+void GenerateRooms(char* dirRooms, const char* arrRooms[]);
 void LoadRoomNames(char* arrRooms[]);
+char[] RoomFilePath(char* dirRooms, char* strRoom);
 
 // Struct definition
 struct Room {
   char roomName[16];
-  char connection1[16]="";
-  char connection2[16]="";
-  char connection3[16]="";
-  char connection4[16]="";
-  char connection5[16]="";
-  char connection6[16]="";
+  char connection1[16];
+  char connection2[16];
+  char connection3[16];
+  char connection4[16];
+  char connection5[16];
+  char connection6[16];
   char roomType[12];
 };
 
-main()
+int main()
 {
   //  Initialize random seed
   srand(1000);
@@ -41,14 +48,15 @@ main()
   strcpy(dirRoom, dirRoomBase);
   strcat(dirRoom, dirPid);
 
-  char* roomNames[7][16];
+  const char* roomNames[]={"Diablo", "Crypt", "Rivendell", "Skyrim", "Morrowind", 
+  "Destiny-SGU", "Transporter"};
 
   // Generate the game content.
-  LoadRoomNames(roomNames);
   GenerateRooms(dirRoom, roomNames);
 
   // Begin the Game for the user.
   Introduction();
+
 
 
   return 0;
@@ -66,12 +74,55 @@ int RoomConnections()
   return (rand() % 4) + 3;
 }
 
-void GenerateRooms(char* dirRooms, char* arrRooms[])
+int RoomSelector()
+{
+  // 0 - 6 in the array.
+  return (rand() % 7);
+}
+
+void GenerateRooms(char* dirRooms, const char* arrRooms[])
 {
   // printf("DEBUG: dirRoom is %s\n", dirRooms);
+  ssize_t numRead;
+  ssize_t numWrite;
+  
+  mode_t filePerms;
+
+  char buf[BUF_SIZE];
+
   for (int i = 0; i < 7; ++i)
   {
-    /* code */
+    // Initially create all the files that we will be using.
+    char file[];
+    strcat(file,"/");
+    strcat(file,dirRooms);
+    strcat(file,"/");
+    strcat(file,arrRooms[i]);
+
+    strcpy(buf,"ROOM NAME: ");
+    strcat(buf,arrRooms[i]);
+
+    fd = open(file, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd == -1){
+      errExit("open");
+    }else {
+
+    }
+  }
+
+  for (int i = 0; i < 7; ++i)
+  {
+    switch(i){
+      case 0:
+      // Start_room
+        break;
+      case 6:
+      // End_room
+        break;
+      case default:
+      // MID_ROOM
+        break;
+      }
   }
 
   return ;
@@ -81,30 +132,35 @@ void LoadRoomNames(char* arrRooms[])
 {
   for (int i = 0; i < 7; ++i)
   {
-    switch i
-      case 0:
-        strcpy(arrRooms[i][],"Diablo");
-        break;
-      case 1:
-        strcpy(arrRooms[i][],"Crypt");
-        break;
-      case 2:
-        strcpy(arrRooms[i][],"Rivendell");
-        break;
-      case 3:
-        strcpy(arrRooms[i][],"Skyrim");
-        break;
-      case 4:
-        strcpy(arrRooms[i][],"Morrowind");
-        break;
-      case 5:
-        strcpy(arrRooms[i][],"Destiny-SGU");
-        break;
-      case 6:
-        strcpy(arrRooms[i][],"Transporter");
-        break;
-      case default:
-        break;
+    // switch(i){
+    //   case 0:
+    //     break;
+    //   case 1:;
+    //     break;
+    //   case 2:
+    //     break;
+    //   case 3:;
+    //     break;
+    //   case 4:
+    //     break;
+    //   case 5:
+    //     break;
+    //   case 6:
+    //     break;
+    //   case default:
+    //     break;
+    //   }
   }
 
+}
+
+char[] RoomFilePath(char* dirRooms, char* strRoom)
+{
+  char RetVal[];
+  strcat(RetVal,"/");
+  strcat(RetVal,dirRooms);
+  strcat(RetVal,"/");
+  strcat(RetVal,strRoom);
+
+  return RetVal; 
 }
