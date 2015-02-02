@@ -10,6 +10,7 @@
 // Function definitions
 void Introduction();
 int RoomConnections();
+void GenerateRooms();
 
 // Struct definition
 struct Room {
@@ -26,10 +27,10 @@ main()
   // Initialize variables
 
   // Generate the game content.
+  GenerateRooms();
 
   // Begin the Game for the user.
   Introduction();
-  printf("My current process id/pid is %d\n", getpid());
 
 
   return 0;
@@ -39,11 +40,28 @@ main()
 void Introduction()
 {
   printf("Welcome to The Land of CS 344 Adventure.\n\n");
-
   return;
 }
 
 int RoomConnections()
 {
   return (rand() % 4) + 3;
-};
+}
+
+void GenerateRooms()
+{
+  const char* dirRoomBase = "reitanc.rooms.";
+  int procid = getpid();
+  char* dirPid;
+  dirPid = malloc(strlen((char)procid)+1);
+  strcpy(dirPid, (char)procid);
+
+  char* dirRoom;
+  dirRoom = malloc(strlen(dirRoomBase) + strlen(dirPid) + 1);
+  strcpy(dirRoom, dirRoomBase);
+  strcat(dirRoom, dirPid);
+
+  printf("DEBUG: dirRoom is %s\n", dirRoom);
+
+  return ;
+}
