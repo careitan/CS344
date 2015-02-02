@@ -90,6 +90,7 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
   mode_t filePerms;
 
   int i, fd;
+  FILE *fp;
 
   char buf[BUF_SIZE];
 
@@ -100,6 +101,7 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
   //printf("DEBUG newDir set to: %s\n", newDir);
 
   mkdir(newDir, 0777);
+  chmod(newDir, 0777);
   //mkdir(newDir, DIR_PERMS);
 
   for (i = 0; i < 7; ++i)
@@ -110,18 +112,31 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
     file = RoomFilePath(dirRooms, Room);
     printf("DEBUG char* file set to: %s\n", file);
 
-    fd = open(file, O_RDWR | O_CREAT, 0777);
-    printf("DEBUG fd set to: %d\n", fd);
-    
-    if (fd == -1){
-      fprintf(stderr, "Could not open the new file %s\n", file);
+    // File Pointer Method.
+    if((fp = fopen(file, "w+"))==NULL){
+      fprintf(stderr, "Cannot open a file: %s\n", file);
+      exit(1);
     }else{
       strcpy(buf,"");
       strcat(buf,"ROOM NAME: ");
       strcat(buf,arrRooms[i]);
-      numWrite = write(fd, buf, BUF_SIZE);
-      close(fd);
+
+      fputs(buf,fp);
     }
+
+    // Regular Open Method.
+    // fd = open(file, O_RDWR|O_CREAT, 0777);
+    // printf("DEBUG fd set to: %d\n", fd);
+    
+    // if (fd == -1){
+    //   fprintf(stderr, "Could not open the new file %s\n", file);
+    // }else{
+    //   strcpy(buf,"");
+    //   strcat(buf,"ROOM NAME: ");
+    //   strcat(buf,arrRooms[i]);
+    //   numWrite = write(fd, buf, BUF_SIZE);
+    //   close(fd);
+    // }
   }
 
   for (i = 0; i < 7; ++i)
@@ -145,7 +160,6 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
 void LoadRoomNames(char* arrRooms[])
 {
   int i;
-
 
   for (i = 0; i < 7; ++i)
   {
@@ -175,7 +189,8 @@ char* RoomFilePath(char* dirRooms, const char* strRoom)
 {
   char* RetVal;
   strcpy(RetVal,"");
-  strcat(RetVal,"~/");
+  //strcat(RetVal,"~/");
+  strcat(RetVal,"/");
   strcat(RetVal,dirRooms);
   strcat(RetVal,"/");
   strcat(RetVal,strRoom);
