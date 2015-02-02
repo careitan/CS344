@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 // Function definitions
 void Introduction();
@@ -28,7 +29,7 @@ main()
 
   // Begin the Game for the user.
   Introduction();
-
+  printf("My current process id/pid is %d\n", getpid());
 
 
   return 0;
@@ -37,7 +38,7 @@ main()
 // Function Build outs
 void Introduction()
 {
-  printf("Welcome to the land of CS 344 Adventure.\n\n");
+  printf("Welcome to The Land of CS 344 Adventure.\n\n");
 
   return;
 }
