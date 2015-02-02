@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <fcntl.h>
 
 #ifndef BUF_SIZE
@@ -88,34 +89,36 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
   
   mode_t filePerms;
 
-  int fd;
+  int i, fd;
 
   char buf[BUF_SIZE];
 
-  for (int i = 0; i < 7; ++i)
+  // Make the initial root directory for this program iteration run.
+  mkdir(dirRooms, 777);
+
+  for (i = 0; i < 7; ++i)
   {
     // Initially create all the files that we will be using.
     const char* Room = arrRooms[i];
     char* file;
     file = RoomFilePath(dirRooms, Room);
     printf("DEBUG char* file set to: %s\n", file);
-    // strcat(file,"/");
-    // strcat(file,dirRooms);
-    // strcat(file,"/");
-    // strcat(file,arrRooms[i]);
 
     strcpy(buf,"ROOM NAME: ");
     strcat(buf,arrRooms[i]);
 
-    fd = open(file, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    fd = open(file, O_RDWR|O_CREAT,777);
+    printf("DEBUG fd set to: %d\n", fd);
+
     if (fd == -1){
-    }else {
+      fprintf(stderr, "Could not open the new file %s\n", file);
+    }else{
       numWrite = write(fd, buf, BUF_SIZE);
       close(fd);
     }
   }
 
-  for (int i = 0; i < 7; ++i)
+  for (i = 0; i < 7; ++i)
   {
     // switch(i){
     //   case 0:
@@ -135,7 +138,10 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
 
 void LoadRoomNames(char* arrRooms[])
 {
-  for (int i = 0; i < 7; ++i)
+  int i;
+
+
+  for (i = 0; i < 7; ++i)
   {
     // switch(i){
     //   case 0:
@@ -163,10 +169,11 @@ char* RoomFilePath(char* dirRooms, const char* strRoom)
 {
   char* RetVal;
   strcpy(RetVal,"");
-  //strcat(RetVal,"/");
+  strcat(RetVal,"/");
   strcat(RetVal,dirRooms);
   strcat(RetVal,"/");
   strcat(RetVal,strRoom);
+  strcat(RetVal,".txt");
 
   return RetVal; 
 }
