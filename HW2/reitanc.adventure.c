@@ -113,30 +113,30 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
     printf("DEBUG char* file set to: %s\n", file);
 
     // File Pointer Method.
-    if((fp = fopen(file, "w+"))==NULL){
-      fprintf(stderr, "Cannot open a file: %s\n", file);
-      exit(1);
-    }else{
-      strcpy(buf,"");
-      strcat(buf,"ROOM NAME: ");
-      strcat(buf,arrRooms[i]);
-
-      fputs(buf,fp);
-    }
-
-    // Regular Open Method.
-    // fd = open(file, O_RDWR|O_CREAT, 0777);
-    // printf("DEBUG fd set to: %d\n", fd);
-    
-    // if (fd == -1){
-    //   fprintf(stderr, "Could not open the new file %s\n", file);
+    // if((fp = fopen(file, "w+"))==NULL){
+    //   fprintf(stderr, "Cannot open a file: %s\n", file);
+    //   exit(1);
     // }else{
     //   strcpy(buf,"");
     //   strcat(buf,"ROOM NAME: ");
     //   strcat(buf,arrRooms[i]);
-    //   numWrite = write(fd, buf, BUF_SIZE);
-    //   close(fd);
+
+    //   fputs(buf,fp);
     // }
+
+    // Regular Open Method.
+    fd = open(file, O_RDWR|O_CREAT, 0777);
+    printf("DEBUG fd set to: %d\n", fd);
+    
+    if (fd == -1){
+      fprintf(stderr, "Could not open the new file %s\n", file);
+    }else{
+      strcpy(buf,"");
+      strcat(buf,"ROOM NAME: ");
+      strcat(buf,arrRooms[i]);
+      numWrite = write(fd, buf, BUF_SIZE);
+      close(fd);
+    }
   }
 
   for (i = 0; i < 7; ++i)
