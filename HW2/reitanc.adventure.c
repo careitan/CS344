@@ -126,7 +126,6 @@ void GenerateRooms(char* dirRooms, const char* arrRooms[])
 
     // Regular Open Method.
     fd = open(file, O_RDWR|O_CREAT, 0777);
-    printf("DEBUG fd set to: %d\n", fd);
     
     if (fd == -1){
       fprintf(stderr, "Could not open the new file %s\n", file);
