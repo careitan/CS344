@@ -1,5 +1,5 @@
 #!/bin/sh
-set -x
+#set -x
 c=$( echo $1 | cut -c -2 )
 f=$2
 e=0
@@ -41,33 +41,30 @@ if [[ $c == "-r" ]]; then
     echo -e "$avg \t $median"
   done<$f
 else
-  while read myLine
-  do
-    #http://forum.linuxcareer.com/threads/1645-Calculate-column-average-using-bash-shell
-    columns=$( echo $myLine|sed -e 's/ /\n/g'|sort -n|wc -l )
-    for (( i = 1; i <= columns; i++ )); do
-      avg=0
-      median=0
-      number=0
+        # Find max number of columns in file
+        columns=$(cat test_file | awk 'BEGIN {$mynf=0} {if ($mynf < NF) $mynf=NF} END {print $mynf}')
 
-      #for j in $( awk '{ print \$$i; }' $f ); do
-      cat $f|awk '{print $i}'|while read col1; do
-        avg=$(echo $avg+$col1| bc )
-        median=$( echo $median " " $col1 )
-        number=$[$number + 1]
-      done
-      avg=$(echo "scale=0;$avg/$number" | bc)
-      median=$( echo $median|sed -e 's/ /\n/g'|sort -n )
-      if [[ $( expr $number % 2 ) -ne 0 ]]; then
-        median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) + 1 ) )
-      else
-        median=$( echo $median|cut -d ' ' -f $( expr \( $number / 2 \) ) )
-      fi
-      avgList=$( echo -e $avgList "   " $avg )
-      medianList=$( echo -e $medianList "   " $median )
-    done
-  done<$f
-  echo -e "Averages:\n\n$avgList\n\nMedians:\n\n$medianList\n"
-  exit 0
+        # For each column
+        for (( i=1; i <= columns; i++ )); do
+                # Get the column
+                myCol[$i]=$(cat test_file | awk "{print $i}")
+
+                # Find median
+                median=$(echo ${myCol[$i]} | sed -e 's/ /\n/g' | sort -n) || 0
+                number=$(echo ${myCol[$i]} | sed -e 's/ /\n/g' | sort -n | wc -l) || 0
+                if [[ $( expr $number % 2 ) -ne 0 ]]; then
+                        median=$(echo $median | cut -d ' ' -f $(expr \( $number / 2 \) + 1 )) || 0
+                else
+                        median=$(echo $median | cut -d ' ' -f $(expr \( $number / 2 \))) || 0
+                fi
+
+                # Find Average
+                avg=$(expr `echo ${myCol[$i]} | sed -e 's/ / + /g' -e "s,$, \) / $number," -e "s/^/\( /"`) || 0
+
+                # Display results
+                echo -e "$avg \t $median"
+        done
+#       echo -e "Averages:\n\n$avgList\n\nMedians:\n\n$medianList\n"
+#       exit 0
 fi
 exit 0
