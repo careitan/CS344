@@ -93,6 +93,7 @@ void GenerateRooms(char* dirRooms, char* arrRooms[])
   FILE *fp;
 
   char buf[BUF_SIZE];
+  char* room;
 
   // Make the initial root directory for this program iteration run.
   char* newDir;
@@ -108,10 +109,16 @@ void GenerateRooms(char* dirRooms, char* arrRooms[])
   {
     // Initially create all the files that we will be using.
     printf("DEBUG arrRooms[i] set to: %s\n", arrRooms[i]);
-    char* Room = arrRooms[i];
+    printf("DEBUG Room set to: %s\n", room);
+    strcpy(room,"");
+    printf("DEBUG Room set to: %s\n", room);
+    strcat(room, arrRooms[i]);
+    printf("DEBUG Room set to: %s\n", room);
+
     char* file;
     strcpy(file,"");
-    strcat(file,RoomFilePath(dirRooms, Room));
+    printf("DEBUG file set to: %s\n", file);
+    strcat(file,RoomFilePath(dirRooms, room));
     
     //file = RoomFilePath(dirRooms, Room);
     printf("DEBUG char* file set to: %s\n", file);
