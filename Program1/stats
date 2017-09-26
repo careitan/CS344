@@ -1,8 +1,12 @@
 #!/bin/bash
+#####
 # CS 344 Fall 2017 Program 1 stats
 # (Craig) Allan Reitan
 # use: stats {-rows | -cols} [Input File Name]
 # 9/25/2017
 #####
 
+#capturing the initial parameters for later us in process control and file access.
+echo $1>param1
+echo $2>param2	
 
