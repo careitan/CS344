@@ -6,7 +6,25 @@
 # 9/25/2017
 #####
 
-#capturing the initial parameters for later us in process control and file access.
-echo $1>param1
-echo $2>param2	
+#capturing the initial commandline parameters for later us in process control and file access.
+d=$(echo $1 | cut -c -2)
+f=$2
+
+#DEBUG
+#echo $d; echo $f
+
+# Checking directional parameter to make sure that a valid option was picked.  Displaying message and exiting with error.
+if [[ $d != "-r" && $d != "-c" ]]; then
+        echo "Usage: stats {-rows|-cols} [file]"
+        exit 1
+fi
+
+#Checking to see if the file name provided is readable or if it does NOT exist before proceeding.  Displaying message and exiting with error.
+if [[ ! -r "$f" || ! -e "$f" ]]; then
+		echo "$0: Cannot Read or Locate $f"
+        echo "$0: Cannot Read or Locate $f">stats_err
+        exit 1
+fi
+
+
 
