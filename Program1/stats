@@ -10,17 +10,22 @@
 d=$(echo $1 | cut -c -2)
 f=$2
 
+#DEBUG
+
+# Check for correct amount of paramters
+if [[ $# < 1 || $# > 2 ]]; then
+	echo "$0: COMMAND LINE ERROR Number of Arguments- Usage: stats {-rows|-cols} [file]" 1>&2
+	exit 1
 # Checking directional parameter to make sure that a valid option was picked.  Displaying message and exiting with error.
-if [[ $d != "-r" && $d != "-c" ]]; then
-        echo "Usage: stats {-rows|-cols} [file]"
-        exit 1
+elif [[ $d != "-r" && $d != "-c" ]]; then
+    echo "$0: COMMAND LINE ERROR Rows or Columns- Usage: stats {-rows|-cols} [file]" 1>&2
+    exit 1
 fi
 
 #Checking to see if the file name provided is readable or if it does NOT exist before proceeding.  Displaying message and exiting with error.
-if [[ ! -r "$f" || ! -e "$f" ]]; then
-		echo "$0: Cannot Read or Locate $f"
-        echo "$0: Cannot Read or Locate $f">stats_err
-        exit 1
+if [[ (! -r "$f" || ! -e "$f") && $# == 2 ]]; then
+    echo "$0: COMMAND LINE ERROR File Access - Cannot Read or Locate $f" 1>&2
+    exit 1
 fi
 
 # Initialize the variables that I plan to use with the loops and calculations
@@ -34,4 +39,17 @@ fi
 count=0; number=0
 avg=0; avgList=0
 median=0; medianList=0
+
+# Prepare Output
+echo "Average Median"
+
+# Process by Rows
+if [[ $d == "-r" ]]; then
+
+# Process by Cols
+elif [[ $d == "-c" ]]; then
+
+else
+	echo "Calculations did not occur."
+fi
 
