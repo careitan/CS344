@@ -10,9 +10,6 @@
 d=$(echo $1 | cut -c -2)
 f=$2
 
-#DEBUG
-#echo $d; echo $f
-
 # Checking directional parameter to make sure that a valid option was picked.  Displaying message and exiting with error.
 if [[ $d != "-r" && $d != "-c" ]]; then
         echo "Usage: stats {-rows|-cols} [file]"
@@ -26,5 +23,15 @@ if [[ ! -r "$f" || ! -e "$f" ]]; then
         exit 1
 fi
 
-
+# Initialize the variables that I plan to use with the loops and calculations
+# count: will count the iteration number through a loop
+# number: a holding variable if a value is read out of file or filtered out of some other data source
+# avg: calulcate the average for a data set
+# median: calculate or derive the median value for data set
+# These are declared for planning purpose, may not actually be implemented if a better alogrithm can be found.
+# avgList: Accumulate series of avg calculations for output to another location.
+# medianList: Accumulate series of medians calculations for output to another location.
+count=0; number=0
+avg=0; avgList=0
+median=0; medianList=0
 
