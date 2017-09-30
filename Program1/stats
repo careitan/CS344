@@ -39,17 +39,41 @@ fi
 count=0; number=0
 avg=0; avgList=0
 median=0; medianList=0
+userInput='';userData='';
+
+# Get manual input from user
+if [[ $# == 1 ]]; then
+	while [[ $userInput != *"D" ]]; do
+		read -e -p "Input DATA Set (Use D when Done): " userInput
+		#DEBUG
+		echo "userInput = $userInput"
+		echo "$userInput">userInput000
+
+		if [[ $userInput != *"D" ]]; then
+			echo $userInput>>userInput_File$$
+		fi
+		#statements
+	done
+
+	cat userInput_File$$>userData
+	rm userInput000
+	rm userInput_File$$
+else
+	echo $(<$f)>userData
+fi
+
+#DEBUG
+echo "userData = $userData"
 
 # Prepare Output
 echo "Average Median"
 
 # Process by Rows
-if [[ $d == "-r" ]]; then
+#if [[ $d == "-r" ]]; then
 
 # Process by Cols
-elif [[ $d == "-c" ]]; then
+#elif [[ $d == "-c" ]]; then
 
-else
-	echo "Calculations did not occur."
-fi
-
+#else
+#	echo "Calculations did not occur."
+#fi
