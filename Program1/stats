@@ -29,42 +29,67 @@ if [[ (! -r "$f" || ! -e "$f") && $# == 2 ]]; then
 fi
 
 # Initialize the variables that I plan to use with the loops and calculations
-# count: will count the iteration number through a loop
+# index: will count the iteration number through the primary loop.
+# Rowcount & Colcount: will hold the count of Rows and Columns in the Dataset (Zero Based)
 # number: a holding variable if a value is read out of file or filtered out of some other data source
 # avg: calulcate the average for a data set
 # median: calculate or derive the median value for data set
 # These are declared for planning purpose, may not actually be implemented if a better alogrithm can be found.
 # avgList: Accumulate series of avg calculations for output to another location.
 # medianList: Accumulate series of medians calculations for output to another location.
-count=0; number=0
+index=0;
+Rowcount=1; Colcount =1;
+number=0
 avg=0; avgList=0
 median=0; medianList=0
 userInput='';userData='';
 
 # Get manual input from user
 if [[ $# == 1 ]]; then
+	echo "Use 'D' to proceed with calculations"
 	while [[ $userInput != *"D" ]]; do
-		read -e -p "Input DATA Set (Use D when Done): " userInput
+		read -r -p "Input a row of the DATA Set: " userInput
 		#DEBUG
-		echo "userInput = $userInput"
-		echo "$userInput">userInput000
-
+		#echo "userInput = $userInput"
+		echo "Rowcount = $Rowcount"
 		if [[ $userInput != *"D" ]]; then
-			echo $userInput>>userInput_File$$
+		echo "$userInput" >userInput_Row$Rowcount
+		Rowcount=$(expr $Rowcount + 1)
 		fi
-		#statements
 	done
-
-	cat userInput_File$$>userData
-	rm userInput000
-	rm userInput_File$$
+	# While loop will run One more time than necessary to reach exit point
+	# Backing off last iteration in the Rowcount
+	Rowcount=$(expr $Rowcount - 1)
 else
-	echo $(<$f)>userData
+	# Found small routine to loop through lines of a file and put in a variable.
+	# https://stackoverflow.com/questions/10929453/read-a-file-line-by-line-assigning-the-value-to-a-variable
+	# Modified it to write it out into a single file per row.
+	# Added the Rowcount to accumulate the number of input rows.
+	
+	# DEBUG
+	# while IFS='' read -r line || [[-n "$line"]];do
+	while IFS='' read -r line;do
+		echo "Rowcount = $Rowcount"
+		echo "$line" >userInput_Row$Rowcount
+		Rowcount=$(expr $Rowcount + 1)
+	done < "$f"
+	# While loop will run One more time than necessary to reach exit point
+	# Backing off last iteration in the Rowcount
+	Rowcount=$(expr $Rowcount - 1)
 fi
 
+# Get Column Count from word count of first row of data, problem requirements said we could assume uniform width of dataset.
+Colcount = $(wc -w < userInput_Row1)
+
+
+
 #DEBUG
+echo "Rowcount = $Rowcount"
+echo "Colcount = $Colcount"
 echo "userData = $userData"
 
+# At this point in the script the user input should be processed out into row files regardless of which input method they used.
+# The next steps will process by rows, or transform them into Column Sets for processing.
 # Prepare Output
 echo "Average Median"
 
@@ -77,3 +102,8 @@ echo "Average Median"
 #else
 #	echo "Calculations did not occur."
 #fi
+
+
+
+
+#rm userInput_Row*
