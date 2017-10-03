@@ -30,6 +30,7 @@ fi
 
 # Initialize the variables that I plan to use with the loops and calculations
 # index: will count the iteration number through the primary loop.
+# elements & lines: parses the userData for the input for calculating 
 # Rowcount & Colcount: will hold the count of Rows and Columns in the Dataset (Zero Based)
 # number: a holding variable if a value is read out of file or filtered out of some other data source
 # avg: calulcate the average for a data set
@@ -42,64 +43,70 @@ Rowcount=1; Colcount=1;
 number=0
 avg=0; avgList=0
 median=0; medianList=0
-userInput='';userData='';
+userInput='';
+
+# Setup a file to collect the Users data regardless of source input.
+if [[ -e userData ]]; then
+	rm -f userData
+fi
+touch userData
 
 # Get manual input from user
 if [[ $# == 1 ]]; then
 	echo "Use 'D' to proceed with calculations"
+
 	while [[ $userInput != *"D" ]]; do
 		read -r -p "Input a row of the DATA Set: " userInput
 
 		if [[ $userInput != *"D" ]]; then
-		echo "$userInput" >userInput_Row$Rowcount
-		Rowcount=$(expr $Rowcount + 1)
+		#echo "$userInput" >> userInput_Row$Rowcount
+		echo "$userInput" >> userData
 		fi
 	done
 	# While loop will run One more time than necessary to reach exit point
 	# Backing off last iteration in the Rowcount
-	Rowcount=$(expr $Rowcount - 1)
 else
-	# Found small routine to loop through lines of a file and put in a variable.
-	# https://stackoverflow.com/questions/10929453/read-a-file-line-by-line-assigning-the-value-to-a-variable
-	# Modified it to write it out into a single file per row.
-	# Added the Rowcount to accumulate the number of input rows.
-	
-	while IFS='' read -r line;do
-		echo "$line" >userInput_Row$Rowcount
-		Rowcount=$(expr $Rowcount + 1)
-	done < "$f"
-	# While loop will run One more time than necessary to reach exit point
-	# Backing off last iteration in the Rowcount
-	Rowcount=$(expr $Rowcount - 1)
+	# process the input file for the lines of data
+	Rowcount=$(wc -l < $f)
+
+	index=1;
+	until [[ $index > $Rowcount ]]; do
+		head -n $index $f | tail -n 1 >> userData
+		((index++))
+	done
 fi
 
-# Get Column Count from word count of first row of data, problem requirements said we could assume uniform width of dataset.
-Colcount=$(wc -w < userInput_Row1)
+# At this point in the script the user input should be processed into one consistent userData file regardless of which input method they used.
+# The next steps will transform them into Column Sets for processing, if required
 
+# Process by Rows
+if [[ $d == -c* ]]; then
+	echo "Got a c"
+	# Transform the data from rows into cols
+
+fi
+
+# Get Row Count from line count of userData
+Rowcount=$(wc -l < userData)
+# Get Column Count from word count of first row of data, problem requirements said we could assume uniform width of dataset.
+Colcount=$(head -n 1 userData | wc -w)
 
 #DEBUG
 echo "Rowcount = $Rowcount"
 echo "Colcount = $Colcount"
-#echo "userData = $userData"
 
-# At this point in the script the user input should be processed out into row files regardless of which input method they used.
-# The next steps will process by rows, or transform them into Column Sets for processing.
 # Prepare Output
 echo "Average Median"
 
-# Process by Rows
-if [[ $d == "-r" ]]; then
+# Run the calculation processes on the prepared data.
+index=1
+until [[ $index -gt $Rowcount ]];do
 
-# Process by Cols
-elif [[ $d == "-c" ]]; then
-
-else
-	echo "Calculations did not occur."
-	exit 1
-fi
+	((index++))
+done
 
 
 
-
-#rm userInput_Row*
-#rm userInput_Col*
+# rm userData
+# Trapping in case of the Ctrl - C exit
+trap "rm -f userData; exit 1" INT
