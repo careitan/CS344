@@ -6,11 +6,26 @@
 # 9/25/2017
 #####
 
+# First, we test whether bash supports arrays.
+# (Support for arrays was only added recently.)
+#
+whotest[0]='test' || (echo 'Failure: arrays not supported in this version of bash.' && exit 2)
+
 #capturing the initial commandline parameters for later us in process control and file access.
 d=$(echo $1 | cut -c -2)
 f=$2
 
-#DEBUG
+# Setup trap for SIGINT
+trap "cleanup; exit 0" SIGINT
+cleanup ()
+{
+	if [[ -e userData ]]; then
+		rm -f userData
+	fi
+	if [[ -e DataStack* ]]; then
+		rm -f DataStack*
+	fi
+}
 
 # Check for correct amount of paramters
 if [[ $# < 1 || $# > 2 ]]; then
@@ -32,23 +47,23 @@ fi
 # index: will count the iteration number through the primary loop.
 # elements & lines: parses the userData for the input for calculating 
 # Rowcount & Colcount: will hold the count of Rows and Columns in the Dataset (Zero Based)
-# number: a holding variable if a value is read out of file or filtered out of some other data source
+# Colindex: used to iterate through the columns in the rows.
+# number: a holding variable if a value is read out of file or filtered out of some other data source.
 # avg: calulcate the average for a data set
 # median: calculate or derive the median value for data set
 # These are declared for planning purpose, may not actually be implemented if a better alogrithm can be found.
 # avgList: Accumulate series of avg calculations for output to another location.
 # medianList: Accumulate series of medians calculations for output to another location.
-index=0;
-Rowcount=1; Colcount=1;
-number=0
-avg=0; avgList=0
-median=0; medianList=0
+index=0; 
+Rowcount=1; Colcount=1; 
+Colindex=1;
+declare -a number
+avg=0; avgList=''
+median=0; medianList=''
 userInput='';
 
 # Setup a file to collect the Users data regardless of source input.
-if [[ -e userData ]]; then
-	rm -f userData
-fi
+cleanup
 touch userData
 
 # Get manual input from user
@@ -77,15 +92,6 @@ else
 fi
 
 # At this point in the script the user input should be processed into one consistent userData file regardless of which input method they used.
-# The next steps will transform them into Column Sets for processing, if required
-
-# Process by Rows
-if [[ $d == -c* ]]; then
-	echo "Got a c"
-	# Transform the data from rows into cols
-
-fi
-
 # Get Row Count from line count of userData
 Rowcount=$(wc -l < userData)
 # Get Column Count from word count of first row of data, problem requirements said we could assume uniform width of dataset.
@@ -96,17 +102,60 @@ echo "Rowcount = $Rowcount"
 echo "Colcount = $Colcount"
 
 # Prepare Output
-echo "Average Median"
-
 # Run the calculation processes on the prepared data.
 index=1
-until [[ $index -gt $Rowcount ]];do
+if [[ $d == -r* ]]; then
+# Prepare Output
+echo "Average Median"
 
-	((index++))
-done
+# Process Rows
+	until [[ $index -gt $Rowcount ]];do
+		Colindex=1; avg=0;
+
+		if [[ -e DataStack* ]]; then
+			rm -f DataStack*
+		fi
+
+		read -es -a number head -n$index userData | tail -n1
+		until [[ $Colindex -gt $Colcount ]]; do
+			echo number[$Colindex-1] >> DataStack
+			#echo "\n" >> DataStack
+			avg=$($avg + number[$Colindex-1])
+		done
+		sort -n DataStack > DataStackSorted
+		median=head -n$(expr \($Colindex + \($Colindex/2\)\) / $Colindex) | tail -n1
+
+		#Render the row of output
+		rm -f DataStack*
+		((index++))
+	done
+
+elif [[ $d == -c* ]]; then
+# Process Columns
+	Colindex=1
+	until [[ $Colindex -gt $Colcount ]]; do
+		# Step through each row cutting the value out of column Colindex (allowing for the space between the values)
+		# drop the values into a ColData file to be rapidly processed at the end.
+		until [[ $index -gt $Rowcount ]];do
+
+			((index++))
+		done
+		# Process the ColData file
 
 
 
-# rm userData
-# Trapping in case of the Ctrl - C exit
-trap "rm -f userData; exit 1" INT
+
+		((Colindex++))
+	done
+
+# Render Output
+echo "Averages: \n$avgList\nMedians:\nmedianList\n"
+
+else
+	echo "ERROR - Nothing was processed on the input."
+	#cleanup
+	exit 1
+fi
+
+#cleanup
+exit 0
