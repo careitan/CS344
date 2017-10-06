@@ -153,19 +153,32 @@ elif [[ $d == -c* ]]; then
 		# drop the values into a ColData file to be rapidly processed at the end.
 
 		#Reset the Index loop iterator for this next run
-		$index=1
+		index=1; avg=0
 
 		until [[ $index > $Rowcount ]];do
 			#Using cut and indexing over by the Column Count Plus Index-1 to allow for the spaces in the data.
-			number[$index-1]=$(head -n $index userData | tail -n1) | cut -c $(expr $Colindex + $index - 1)
-			echo number[$index-1] >> DataStack
-			avg=$(expr $avg + number[$index-1])
+			
+			head -n$index userData | tail -n1 | cut -f$Colindex >> DataStackCol
+			avg=$avg+$(head -n$index userData | tail -n1 | cut -f$Colindex)
 			((index++))
 		done
+
+		read -es -a number<DataStackCol
+
+		#Calculate the true average of the values by dividing by the Column Count
+		avg=$(($avg+$Rowcount/2))
+		# echo "DEBUG: avg = $avg"
+		avg=$(($avg/$Rowcount))
+
 		# Process the DataStack file
 		# Use sort to prep for finding the middle of the list of numbers
-		sort -n DataStack > DataStackSorted
-		median=head -n $(expr \($Rowcount + \($Rowcount/2\)\) / $Rowcount) DataStackSorted | tail -n1
+		sort -n DataStackCol > DataStackSorted
+
+		# DEBUG
+		#cp DataStackSorted BackStackCol$Colindex
+
+		k=$((($Rowcount+1)/2))
+		median=$(head -n$k DataStackSorted | tail -n1)
 
 		# Begin stacking up the strings that will be the output values to display.
 		avgList=$(echo "$avgList $avg")
@@ -175,13 +188,15 @@ elif [[ $d == -c* ]]; then
 		echo "avgList = $avgList"
 		echo "medianList = $medianList"
 
-		cat DataStack
-		rm -f DataStack
+		rm -f DataStack*
 		((Colindex++))
 	done
 
 # Render Output
-echo "Averages: \n$avgList\nMedians:\n$medianList\n"
+echo "Averages:"
+echo "$avgList"
+echo "Medians:"
+echo "$medianList"
 
 else
 	echo "ERROR - Nothing was processed on the input."
