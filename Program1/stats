@@ -49,6 +49,7 @@ fi
 # Rowcount & Colcount: will hold the count of Rows and Columns in the Dataset (Zero Based)
 # Colindex: used to iterate through the columns in the rows.
 # number: a holding variable if a value is read out of file or filtered out of some other data source.
+# k: variable used to capture a constant/integer value if required.
 # avg: calulcate the average for a data set
 # median: calculate or derive the median value for data set
 # These are declared for planning purpose, may not actually be implemented if a better alogrithm can be found.
@@ -58,6 +59,7 @@ index=0;
 Rowcount=1; Colcount=1; 
 Colindex=1;
 declare -a number
+k=0
 avg=0; avgList=''
 median=0; medianList=''
 userInput='';
@@ -109,33 +111,38 @@ if [[ $d == -r* ]]; then
 echo "Average Median"
 
 # Process Rows
-# DEBUG
-echo "index = $index"
-
 	until [[ $index > $Rowcount ]];do
 		Colindex=1; avg=0;
 
-		if [[ -e DataStack* ]]; then
-			rm -f DataStack*
-		fi
+		# Reading a line into an array for processing
+		head -n $index userData | tail -n1 >> DataStackRow
 
 		# Reading a line into an array for processing
-		read -es -a number head -n $index userData | tail -n1
+		read -es -a number<DataStackRow
 
 		# Loop and stack the data for later sorting
-		until [[ $Colindex -gt $Colcount ]]; do
-			echo number[$Colindex-1] >> DataStack
-			avg=$(expr $avg + number[$Colindex-1])
+		for j in "${number[@]}"; do
+			echo "$j" >> DataStack
+
+			# Just accumulate the values as a SUM while in the loop.
+			avg=$(expr $avg + $j)
 		done
+
+		#Calculate the true average of the values by dividing by the Column Count
+		avg=$(($avg+$Colcount/2))
+		avg=$(($avg / $Colcount))
 
 		# Use sort to prep for finding the middle of the list of numbers
 		sort -n DataStack > DataStackSorted
-		median=head -n $(expr \($Colindex + \($Colindex/2\)\) / $Colindex) DataStackSorted | tail -n1
+		k=$((($Colcount+1)/2))
+		median=$(head -n$k DataStackSorted | tail -n1)
 
 		#Render the row of output
+		echo "$avg $median"
+
+		# Cleanup and prepare for the next iteration of the loop.
 		rm -f DataStack*
 		((index++))
-		echo "$avg $median"
 	done
 
 elif [[ $d == -c* ]]; then
@@ -150,7 +157,7 @@ elif [[ $d == -c* ]]; then
 
 		until [[ $index > $Rowcount ]];do
 			#Using cut and indexing over by the Column Count Plus Index-1 to allow for the spaces in the data.
-			number[$index-1]=$(head -n $index userData | tail -n1) | cut -c $(expr $Colindex+$index-1)
+			number[$index-1]=$(head -n $index userData | tail -n1) | cut -c $(expr $Colindex + $index - 1)
 			echo number[$index-1] >> DataStack
 			avg=$(expr $avg + number[$index-1])
 			((index++))
