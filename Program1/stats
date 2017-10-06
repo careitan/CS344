@@ -135,6 +135,9 @@ echo "Average Median"
 		# Use sort to prep for finding the middle of the list of numbers
 		sort -n DataStack > DataStackSorted
 		k=$((($Colcount+1)/2))
+		if [[ $(expr $k % 2) == 0 ]]; then
+			((k++))
+		fi
 		median=$(head -n$k DataStackSorted | tail -n1)
 
 		#Render the row of output
@@ -178,6 +181,9 @@ elif [[ $d == -c* ]]; then
 		#cp DataStackSorted BackStackCol$Colindex
 
 		k=$((($Rowcount+1)/2))
+		if [[ $(expr $k % 2) == 0 ]]; then
+			((k++))
+		fi
 		median=$(head -n$k DataStackSorted | tail -n1)
 
 		# Begin stacking up the strings that will be the output values to display.
