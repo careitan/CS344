@@ -109,47 +109,72 @@ if [[ $d == -r* ]]; then
 echo "Average Median"
 
 # Process Rows
-	until [[ $index -gt $Rowcount ]];do
+# DEBUG
+echo "index = $index"
+
+	until [[ $index > $Rowcount ]];do
 		Colindex=1; avg=0;
 
 		if [[ -e DataStack* ]]; then
 			rm -f DataStack*
 		fi
 
-		read -es -a number head -n$index userData | tail -n1
+		# Reading a line into an array for processing
+		read -es -a number head -n $index userData | tail -n1
+
+		# Loop and stack the data for later sorting
 		until [[ $Colindex -gt $Colcount ]]; do
 			echo number[$Colindex-1] >> DataStack
-			#echo "\n" >> DataStack
-			avg=$($avg + number[$Colindex-1])
+			avg=$(expr $avg + number[$Colindex-1])
 		done
+
+		# Use sort to prep for finding the middle of the list of numbers
 		sort -n DataStack > DataStackSorted
-		median=head -n$(expr \($Colindex + \($Colindex/2\)\) / $Colindex) | tail -n1
+		median=head -n $(expr \($Colindex + \($Colindex/2\)\) / $Colindex) DataStackSorted | tail -n1
 
 		#Render the row of output
 		rm -f DataStack*
 		((index++))
+		echo "$avg $median"
 	done
 
 elif [[ $d == -c* ]]; then
 # Process Columns
 	Colindex=1
-	until [[ $Colindex -gt $Colcount ]]; do
+	until [[ $Colindex > $Colcount ]]; do
 		# Step through each row cutting the value out of column Colindex (allowing for the space between the values)
 		# drop the values into a ColData file to be rapidly processed at the end.
-		until [[ $index -gt $Rowcount ]];do
 
+		#Reset the Index loop iterator for this next run
+		$index=1
+
+		until [[ $index > $Rowcount ]];do
+			#Using cut and indexing over by the Column Count Plus Index-1 to allow for the spaces in the data.
+			number[$index-1]=$(head -n $index userData | tail -n1) | cut -c $(expr $Colindex+$index-1)
+			echo number[$index-1] >> DataStack
+			avg=$(expr $avg + number[$index-1])
 			((index++))
 		done
-		# Process the ColData file
+		# Process the DataStack file
+		# Use sort to prep for finding the middle of the list of numbers
+		sort -n DataStack > DataStackSorted
+		median=head -n $(expr \($Rowcount + \($Rowcount/2\)\) / $Rowcount) DataStackSorted | tail -n1
 
+		# Begin stacking up the strings that will be the output values to display.
+		avgList=$(echo "$avgList $avg")
+		medianList=$(echo "$medianList $median")
 
+		#DEBUG
+		echo "avgList = $avgList"
+		echo "medianList = $medianList"
 
-
+		cat DataStack
+		rm -f DataStack
 		((Colindex++))
 	done
 
 # Render Output
-echo "Averages: \n$avgList\nMedians:\nmedianList\n"
+echo "Averages: \n$avgList\nMedians:\n$medianList\n"
 
 else
 	echo "ERROR - Nothing was processed on the input."
