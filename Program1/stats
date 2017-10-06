@@ -100,8 +100,8 @@ Rowcount=$(wc -l < userData)
 Colcount=$(head -n 1 userData | wc -w)
 
 #DEBUG
-echo "Rowcount = $Rowcount"
-echo "Colcount = $Colcount"
+#echo "DEBUG: Rowcount = $Rowcount"
+#echo "DEBUG: Colcount = $Colcount"
 
 # Prepare Output
 # Run the calculation processes on the prepared data.
@@ -184,9 +184,8 @@ elif [[ $d == -c* ]]; then
 		avgList=$(echo "$avgList $avg")
 		medianList=$(echo "$medianList $median")
 
-		#DEBUG
-		echo "avgList = $avgList"
-		echo "medianList = $medianList"
+		#echo "DEBUG: avgList = $avgList"
+		#echo "DEBUG: medianList = $medianList"
 
 		rm -f DataStack*
 		((Colindex++))
@@ -200,9 +199,9 @@ echo "$medianList"
 
 else
 	echo "ERROR - Nothing was processed on the input."
-	#cleanup
+	cleanup
 	exit 1
 fi
 
-#cleanup
+cleanup
 exit 0
