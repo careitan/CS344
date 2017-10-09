@@ -67,11 +67,12 @@ userInput='';
 # Setup a file to collect the Users data regardless of source input.
 cleanup
 touch userData
+chmod 666 userData
 
 # Get manual input from user
 if [[ $# == 1 ]]; then
-	echo "Use 'D' to proceed with calculations."
-	echo "Use ' ' between the data elements in a row."
+	#
+	printf "Use 'D' to proceed with calculations.\nUse ' ' between the data elements in a row.\n"
 
 	while [[ $userInput != *"D" ]]; do
 		read -r -p "Input a row of the DATA Set: " userInput
@@ -86,12 +87,17 @@ if [[ $# == 1 ]]; then
 else
 	# process the input file for the lines of data
 	Rowcount=$(wc -l < $f)
+	# echo "DEBUG: Rowcount from file = $Rowcount"
+	
+	while read line; do
+		echo "$line" >> userData
+	done<$f
 
-	index=1;
-	until [[ $index > $Rowcount ]]; do
-		head -n $index $f | tail -n 1 >> userData
-		((index++))
-	done
+	# index=1;
+	# until [[ $index > $Rowcount ]]; do
+		# head -n $index $f | tail -n 1 >> userData
+		# ((index++))
+	# done
 fi
 
 # At this point in the script the user input should be processed into one consistent userData file regardless of which input method they used.
@@ -101,29 +107,34 @@ Rowcount=$(wc -l < userData)
 Colcount=$(head -n 1 userData | wc -w)
 
 #DEBUG
-#echo "DEBUG: Rowcount = $Rowcount"
-#echo "DEBUG: Colcount = $Colcount"
+# echo "DEBUG: Rowcount from userData = $Rowcount"
+# echo "DEBUG: Colcount from userData = $Colcount"
 
 # Prepare Output
 # Run the calculation processes on the prepared data.
 index=1
 if [[ $d == -r* ]]; then
-# Prepare Output
-echo "Average Median"
+	
+	# Prepare Output
+	if [[ $Rowcount > 0 ]]; then
+		echo "Average Median"
+	fi
 
+# Ensure that Index is set to 1 at this location
+index=1
 # Process Rows
-	until [[ $index > $Rowcount ]];do
+	until [[ $(($index-1)) > $Rowcount ]];do
 		Colindex=1; avg=0;
 
 		# Reading a line into an array for processing
-		head -n $index userData | tail -n1 >> DataStackRow
+		head -n $index userData | tail -n1 >> DataStackRow$index
 
 		# Reading a line into an array for processing
-		read -es -a number<DataStackRow
+		read -es -a number<DataStackRow$index
 
 		# Loop and stack the data for later sorting
 		for j in "${number[@]}"; do
-			echo "$j" >> DataStack
+			echo "$j" >> DataStack$index
 
 			# Just accumulate the values as a SUM while in the loop.
 			avg=$(expr $avg + $j)
@@ -134,12 +145,12 @@ echo "Average Median"
 		avg=$(($avg / $Colcount))
 
 		# Use sort to prep for finding the middle of the list of numbers
-		sort -n DataStack > DataStackSorted
+		sort -n DataStack$index > DataStackSorted$index
 		k=$((($Colcount+1)/2))
 		if [[ $(expr $k % 2) == 0 ]]; then
 			((k++))
 		fi
-		median=$(head -n$k DataStackSorted | tail -n1)
+		median=$(head -n$k DataStackSorted$index | tail -n1)
 
 		#Render the row of output
 		echo "$avg $median"
@@ -152,22 +163,16 @@ echo "Average Median"
 elif [[ $d == -c* ]]; then
 # Process Columns
 	Colindex=1
-	until [[ $Colindex > $Colcount ]]; do
+	until [[ $(($Colindex-1)) == $Colcount ]]; do
 		# Step through each row cutting the value out of column Colindex (allowing for the space between the values)
 		# drop the values into a ColData file to be rapidly processed at the end.
 
 		#Reset the Index loop iterator for this next run
 		index=1
 
-		until [[ $index > $Rowcount ]];do
-			#Using cut and indexing over by the Column Count Plus Index-1 to allow for the spaces in the data.
-			if [[ -e $f ]]; then
-				# If using an input file that has tab delimiters then process the cut witht he default delimiters
-				head -n$index userData | tail -n1 | cut -f$Colindex >> DataStackCol$Colindex
-			else
-				# Process the spaces in the STDIN
-				head -n$index userData | tail -n1 | cut -d' ' -f$Colindex >> DataStackCol$Colindex
-			fi
+		until [[ $(($index-1)) == $Rowcount ]];do
+			# Using cut and indexing over by the Column Count Plus Index-1 to allow for the spaces in the data.
+			head -n$index userData | tail -n1 | cut -f$Colindex >> DataStackCol$Colindex
 			((index++))
 		done
 
@@ -205,10 +210,12 @@ elif [[ $d == -c* ]]; then
 	done
 
 # Render Output
-echo "Averages:"
-echo "$avgList"
-echo "Medians:"
-echo "$medianList"
+if [[ $Rowcount > 0 ]]; then
+	echo "Averages:"
+	echo "$avgList"
+	echo "Medians:"
+	echo "$medianList"
+fi
 
 else
 	echo "ERROR - Nothing was processed on the input."
