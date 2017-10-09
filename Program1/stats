@@ -123,7 +123,7 @@ if [[ $d == -r* ]]; then
 # Ensure that Index is set to 1 at this location
 index=1
 # Process Rows
-	until [[ $(($index-1)) > $Rowcount ]];do
+	until [[ $(($index-1)) == $Rowcount ]];do
 		Colindex=1; avg=0;
 
 		# Reading a line into an array for processing
@@ -141,8 +141,13 @@ index=1
 		done
 
 		#Calculate the true average of the values by dividing by the Column Count
-		avg=$(($avg+$Colcount/2))
-		avg=$(($avg / $Colcount))
+		if [[ $Colcount > 0 ]]; then
+			avg=$(($avg+$Colcount/2))
+			avg=$(($avg / $Colcount))
+		else
+			printf "Unable to Average, no Columns counted and would cause Divide by Zero Erro."
+			exit 1
+		fi
 
 		# Use sort to prep for finding the middle of the list of numbers
 		sort -n DataStack$index > DataStackSorted$index
@@ -186,9 +191,14 @@ elif [[ $d == -c* ]]; then
 		done
 
 		#Calculate the true average of the values by dividing by the Column Count
-		avg=$(($avg+$Rowcount/2))
-		# echo "DEBUG: avg = $avg"
-		avg=$(($avg/$Rowcount))
+		if [[ $Rowcount > 0 ]]; then
+			avg=$(($avg+$Rowcount/2))
+			# echo "DEBUG: avg = $avg"
+			avg=$(($avg/$Rowcount))
+		else
+			printf "Unable to average, Rowcount is detected as Zero and would cause a Divide by Zero Error"
+			exit 1
+		fi
 
 		# Process the DataStack file
 		# Use sort to prep for finding the middle of the list of numbers
