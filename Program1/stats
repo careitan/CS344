@@ -70,7 +70,8 @@ touch userData
 
 # Get manual input from user
 if [[ $# == 1 ]]; then
-	echo "Use 'D' to proceed with calculations"
+	echo "Use 'D' to proceed with calculations."
+	echo "Use ' ' between the data elements in a row."
 
 	while [[ $userInput != *"D" ]]; do
 		read -r -p "Input a row of the DATA Set: " userInput
@@ -156,17 +157,28 @@ elif [[ $d == -c* ]]; then
 		# drop the values into a ColData file to be rapidly processed at the end.
 
 		#Reset the Index loop iterator for this next run
-		index=1; avg=0
+		index=1
 
 		until [[ $index > $Rowcount ]];do
 			#Using cut and indexing over by the Column Count Plus Index-1 to allow for the spaces in the data.
-			
-			head -n$index userData | tail -n1 | cut -f$Colindex >> DataStackCol
-			avg=$avg+$(head -n$index userData | tail -n1 | cut -f$Colindex)
+			if [[ -e $f ]]; then
+				# If using an input file that has tab delimiters then process the cut witht he default delimiters
+				head -n$index userData | tail -n1 | cut -f$Colindex >> DataStackCol$Colindex
+			else
+				# Process the spaces in the STDIN
+				head -n$index userData | tail -n1 | cut -d' ' -f$Colindex >> DataStackCol$Colindex
+			fi
 			((index++))
 		done
 
-		read -es -a number<DataStackCol
+		# Read in the set of values for the Data Column and then prepare to calculate them.
+		number=($(<DataStackCol$Colindex))
+		
+		avg=0;
+		
+		for n in "${number[@]}"; do
+			avg=$(expr $avg + $n)
+		done
 
 		#Calculate the true average of the values by dividing by the Column Count
 		avg=$(($avg+$Rowcount/2))
@@ -175,23 +187,18 @@ elif [[ $d == -c* ]]; then
 
 		# Process the DataStack file
 		# Use sort to prep for finding the middle of the list of numbers
-		sort -n DataStackCol > DataStackSorted
-
-		# DEBUG
-		#cp DataStackSorted BackStackCol$Colindex
+		sort -n DataStackCol$Colindex > DataStackSorted$Colindex
 
 		k=$((($Rowcount+1)/2))
-		if [[ $(expr $k % 2) == 0 ]]; then
+		# Checking to see if ther is an even number of rows and moving the median index up +1 to take the higher of the two positions.
+		if [[ $(expr $Rowcount % 2) == 0 ]]; then
 			((k++))
 		fi
-		median=$(head -n$k DataStackSorted | tail -n1)
+		median=$(head -n$k DataStackSorted$Colindex | tail -n1)
 
 		# Begin stacking up the strings that will be the output values to display.
 		avgList=$(echo "$avgList $avg")
 		medianList=$(echo "$medianList $median")
-
-		#echo "DEBUG: avgList = $avgList"
-		#echo "DEBUG: medianList = $medianList"
 
 		rm -f DataStack*
 		((Colindex++))
