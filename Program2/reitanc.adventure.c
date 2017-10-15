@@ -3,15 +3,18 @@
  * (Craig) Allan Reitan
  * Adventure File for program implementation
  * 10/14/2017
- * ****/
+ *****/
 
-#include "stdio.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <string.h>
 
 
-void main(int argc, char* argv[])
+int main(int argc, char* argv[])
 {
 
 
 
-return
-}
+	return 0;
+};
