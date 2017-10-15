@@ -11,20 +11,22 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 // Global defined variables or structs
 enum Room_TYPE {MID_ROOM = 1, START_ROOM, END_ROOM};
 
 struct Room {
-	char Name[12];
+	char* Name;
 	char* Connections[6];
-	int Type;
-};
+	enum Room_TYPE Type;
+}UsedRooms[7];
 
 // Function Headers used this file.
 int DM_Friend(int min_num, int max_num);  // The Dungeon Master's Friend.
 
 bool IsGraphFull();
+bool RoomExists(char* value);
 void AddRandomConnection();
 struct Room GetRandomRoom();
 bool CanAddConnectionFrom(struct Room x);
@@ -40,31 +42,34 @@ int main(int argc, char* argv[])
 	srand((unsigned int) time(0));  // Gentlemen, start your random engines.
 
 	int i, j, k, r; // k will be used for indexing a while loop and then auto-incrementing at end of loop.
-
-	char* UsedRooms[7] = {"none"};
-
-	for (i = 0; i < 7; ++i) {
-		UsedRooms[i]="none";
-
-		// DEBUG
-		// printf("UsedRooms[%i] = %s\n",i, UsedRooms[i]);
-	}
+	int ProcID;
 
 	// Select 7 room at random for the game space.
 	for (i = 0; i < 7; ++i)
 	{
-		//DEBUGGING
-		r=DM_Friend(0,9);
-		printf("Room name drawn is: %s\n", RoomNames[r]);
-		UsedRooms[i] = RoomNames[r];
+		do
+		{
+			r=DM_Friend(0,9);
+		}while(RoomExists(RoomNames[r])==true);
+
+		//printf("Room name drawn is: %s\n", RoomNames[r]);
+		UsedRooms[i].Name = RoomNames[r];
+		UsedRooms[i].Type = MID_ROOM;
 	}
 
+	// Set the Start Room and End Room flags
+	UsedRooms[0].Type = START_ROOM;
+	UsedRooms[6].Type = END_ROOM;
+
 	// Create all connections in graph
+	// DEBUG
+	printf("About to start the WHILE loop to populate the Rooms.\n");
 	while (IsGraphFull() == false)
 	{
 	  AddRandomConnection();
 	}
-
+	printf("Finished the WHILE loop to populate the Rooms.\n");
+	
 	return 0;
 };
 
@@ -89,8 +94,47 @@ int DM_Friend(int min_num, int max_num)
 // Returns true if all rooms have 3 to 6 outbound connections, false otherwise
 bool IsGraphFull()  
 {
-  
-  return true;
+  int i;
+  bool ReturnVal = false;
+
+  for (i = 0; i < 7; ++i)
+  {
+  	if (UsedRooms[i].Connections[2] == NULL || UsedRooms[i].Connections[5] == NULL)
+  	{
+  		ReturnVal = ReturnVal && false;
+  	}
+  	else if (UsedRooms[i].Connections[5] == NULL)
+  	{
+  		ReturnVal = ReturnVal && false;
+  	}else
+  	{
+  		ReturnVal = ReturnVal && true;
+  	}
+  }
+
+  return ReturnVal;
+}
+
+// Check to see if the name picked is already assigned to a room
+bool RoomExists(char* value)
+{
+	int k;
+	bool ReturnVal = false;
+
+	for (k=0; k<7; k++){
+		if (UsedRooms[k].Name == value)
+		{
+			ReturnVal = true;
+			return ReturnVal;
+		}
+		else if (UsedRooms[k].Name == NULL)
+		{
+			ReturnVal = false;
+			return ReturnVal;
+		}
+	} 
+
+	return ReturnVal;
 }
 
 // Adds a random, valid outbound connection from a Room to another Room
@@ -122,27 +166,50 @@ void AddRandomConnection()
 // Returns a random Room, does NOT validate if connection can be added
 struct Room GetRandomRoom()
 {
-	struct Room A;
-
-	return A;
+	return UsedRooms[DM_Friend(0,6)];
 }
 
 // Returns true if a connection can be added from Room x, false otherwise
 bool CanAddConnectionFrom(struct Room x) 
 {
-
-  return true;
+  return x.Connections[6] == NULL;
 }
 
 // Connects Rooms x and y together, does not check if this connection is valid
 void ConnectRoom(struct Room x, struct Room y) 
 {
-  
+  int i, k;
+
+  for (i = 0; i < 6; ++i)
+  {
+  	if (UsedRooms[i].Name == x.Name)
+  	{
+  		for (k = 0; k < 5; ++k)
+  		{
+  			if (UsedRooms[i].Connections[k] == NULL)
+  			{
+  				UsedRooms[i].Connections[k] = y.Name;
+  				continue;
+  			}
+  		}
+  	}else if (UsedRooms[i].Name == y.Name)
+  	{
+  		for (k = 0; k < 5; ++k)
+  		{
+  			if (UsedRooms[i].Connections[k] == NULL)
+  			{
+  				UsedRooms[i].Connections[k] = x.Name;
+  				continue;
+  			}
+  		}
+  	}
+  }
+
   return;
 }
 
 // Returns true if Rooms x and y are the same Room, false otherwise
 bool IsSameRoom(struct Room x, struct Room y) 
 {
-  return true;
+  return (x.Name == y.Name);
 }
