@@ -17,6 +17,8 @@ typedef int bool;
 #define true  1
 #define false 0
 
+#define PERMS 0666	// RW for owner, group, others
+
 // Global defined variables or structs
 enum Room_TYPE {MID_ROOM = 1, START_ROOM, END_ROOM};
 
@@ -37,6 +39,7 @@ bool CanAddConnectionFrom(struct Room x);
 bool IsAlreadyConnected(struct Room x, struct Room y);
 void ConnectRoom(struct Room x, struct Room y);
 bool IsSameRoom(struct Room x, struct Room y);
+void WriteOutput(int pid);
 
 // Master list of the Room names to be accessible as a Global
 char* RoomNames[] = {"Holodeck", "Narnia", "Rivendell", "Mordor", "Moria", "Serenity", "Skyrim", "Bob", "Olympia", "Seattle"};
@@ -85,6 +88,9 @@ int main(int argc, char* argv[])
 	  AddRandomConnection();
 	}
 	
+	// Write the Output Files in the corresponding directory
+	WriteOutput(ProcID);
+
 	return 0;
 };
 
@@ -243,4 +249,57 @@ bool IsSameRoom(struct Room x, struct Room y)
 	if (x.Name == y.Name) ReturnVal=true;
 
   return ReturnVal;
+}
+
+// Write the Output files to the corresponding directory requirements
+void WriteOutput(int pid)
+{
+	int i, j;
+	int FileID;
+	char *directory;
+	char *FileName;
+	char buf[1024];
+
+	// Prep for Loop
+	sprintf(directory, "reitanc.rooms.%i\\", pid);
+
+	for (i = 0; i < 7; ++i)
+	{
+		//Start out creating the new folder and file object
+		sprintf(FileName, "%s%s\n", directory, UsedRooms[i].Name);
+		if ((FileID = creat(FileName, PERMS)) == -1)
+			printf("ERROR: WriteOut was unable to create file: %s", UsedRooms[i].Name);
+/*		// Write out the Room Name
+		buf = strcat("ROOM NAME: ", UsedRooms[i].Name);
+		buf = strcat(buf, "\n");
+		//fprintf(buf, "ROOM NAME: %s\n", UsedRooms[i].Name);
+		write(FileID, buf, 1024);
+
+		// Write the Connection elements
+		for (j = 0; i < 6; ++j)
+		{
+			if (UsedRooms[i].Connections[j] != "") {
+				fprintf(buf, "CONNECTION %i: %s\n", j, UsedRooms[i].Connections[j]);
+				write(FileID, buf, 1024);
+			}
+		}
+ 
+		// Write the Room Type
+		switch(UsedRooms[i].Type){
+			case 1:
+				fprintf(buf, "ROOM TYPE: MID_ROOM");
+			break;
+			case 2:
+				fprintf(buf, "ROOM TYPE: START_ROOM");
+			break;
+			case 3:
+				fprintf(buf, "ROOM TYPE: FINISH_ROOM");
+			break;
+		}
+*/
+		//write(FileID, buf, 1024);
+		close(FileID);
+	}
+
+	return;
 }
