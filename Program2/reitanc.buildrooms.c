@@ -8,10 +8,14 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+
+// Creating Typedef because bool is not available in ANSI C
+typedef int bool;
+#define true  1
+#define false 0
 
 // Global defined variables or structs
 enum Room_TYPE {MID_ROOM = 1, START_ROOM, END_ROOM};
@@ -30,6 +34,7 @@ bool RoomExists(char* value);
 void AddRandomConnection();
 struct Room GetRandomRoom();
 bool CanAddConnectionFrom(struct Room x);
+bool IsAlreadyConnected(struct Room x, struct Room y);
 void ConnectRoom(struct Room x, struct Room y);
 bool IsSameRoom(struct Room x, struct Room y);
 
@@ -42,7 +47,17 @@ int main(int argc, char* argv[])
 	srand((unsigned int) time(0));  // Gentlemen, start your random engines.
 
 	int i, j, k, r; // k will be used for indexing a while loop and then auto-incrementing at end of loop.
-	int ProcID;
+	
+	// https://stackoverflow.com/questions/8166415/how-to-get-the-pid-of-a-process-in-linux-in-c
+	// Get the ProcessID and store it in a variable for later use in the program.
+	char line[32];
+	FILE *cmd = popen("pidof reitanc.buildrooms", "r");
+
+	fgets(line, 32, cmd);
+	int ProcID = atoi(strtok(line, " "));
+
+	pclose(cmd);
+	// End code to grab the ProcessID for this application.
 
 	// Select 7 room at random for the game space.
 	for (i = 0; i < 7; ++i)
@@ -52,8 +67,11 @@ int main(int argc, char* argv[])
 			r=DM_Friend(0,9);
 		}while(RoomExists(RoomNames[r])==true);
 
-		//printf("Room name drawn is: %s\n", RoomNames[r]);
 		UsedRooms[i].Name = RoomNames[r];
+		for (j = 0; j < 6; ++j)
+		{
+			UsedRooms[i].Connections[j]="";
+		}
 		UsedRooms[i].Type = MID_ROOM;
 	}
 
@@ -62,13 +80,10 @@ int main(int argc, char* argv[])
 	UsedRooms[6].Type = END_ROOM;
 
 	// Create all connections in graph
-	// DEBUG
-	printf("About to start the WHILE loop to populate the Rooms.\n");
-	while (IsGraphFull() == false)
+	while (IsGraphFull() == 0)
 	{
 	  AddRandomConnection();
 	}
-	printf("Finished the WHILE loop to populate the Rooms.\n");
 	
 	return 0;
 };
@@ -97,20 +112,13 @@ bool IsGraphFull()
   int i;
   bool ReturnVal = false;
 
-  for (i = 0; i < 7; ++i)
-  {
-  	if (UsedRooms[i].Connections[2] == NULL || UsedRooms[i].Connections[5] == NULL)
-  	{
-  		ReturnVal = ReturnVal && false;
-  	}
-  	else if (UsedRooms[i].Connections[5] == NULL)
-  	{
-  		ReturnVal = ReturnVal && false;
-  	}else
-  	{
-  		ReturnVal = ReturnVal && true;
-  	}
-  }
+  if (UsedRooms[0].Connections[2] != "" &&
+  	UsedRooms[1].Connections[2] != "" &&
+  	UsedRooms[2].Connections[2] != "" &&
+  	UsedRooms[3].Connections[2] != "" &&
+  	UsedRooms[4].Connections[2] != "" &&
+  	UsedRooms[5].Connections[2] != "" &&
+  	UsedRooms[6].Connections[2] != "") ReturnVal=true;
 
   return ReturnVal;
 }
@@ -143,7 +151,7 @@ void AddRandomConnection()
   struct Room A;  //Maybe a struct, maybe global arrays of ints
   struct Room B;
 
-  while(true)
+  while(1)
   {
     A = GetRandomRoom();
 
@@ -155,7 +163,7 @@ void AddRandomConnection()
   {
     B = GetRandomRoom();
   }
-  while(CanAddConnectionFrom(B) == false || IsSameRoom(A, B) == true);
+  while(CanAddConnectionFrom(B) == false || IsAlreadyConnected(A, B) || IsSameRoom(A, B) == true);
 
   ConnectRoom(A, B);
   ConnectRoom(B, A);
@@ -169,41 +177,60 @@ struct Room GetRandomRoom()
 	return UsedRooms[DM_Friend(0,6)];
 }
 
+// check to see if room X is already connected to room y
+bool IsAlreadyConnected(struct Room x, struct Room y)
+{
+	int i;
+	bool ReturnVal=false;
+
+	for (i = 0; i < 6; ++i)
+	{
+		if (x.Connections[i]==y.Name) ReturnVal=true;
+	}
+
+	return ReturnVal;
+}
+
 // Returns true if a connection can be added from Room x, false otherwise
 bool CanAddConnectionFrom(struct Room x) 
 {
-  return x.Connections[6] == NULL;
+	bool ReturnVal=false;
+
+	if (x.Connections[5] == "") ReturnVal=true;
+
+  return ReturnVal;
 }
 
 // Connects Rooms x and y together, does not check if this connection is valid
 void ConnectRoom(struct Room x, struct Room y) 
 {
   int i, k;
+  bool IsConnected = false;
 
+  // Search to see if there is an existing connection between room x & y.
   for (i = 0; i < 6; ++i)
   {
-  	if (UsedRooms[i].Name == x.Name)
-  	{
-  		for (k = 0; k < 5; ++k)
-  		{
-  			if (UsedRooms[i].Connections[k] == NULL)
-  			{
-  				UsedRooms[i].Connections[k] = y.Name;
-  				continue;
-  			}
-  		}
-  	}else if (UsedRooms[i].Name == y.Name)
-  	{
-  		for (k = 0; k < 5; ++k)
-  		{
-  			if (UsedRooms[i].Connections[k] == NULL)
-  			{
-  				UsedRooms[i].Connections[k] = x.Name;
-  				continue;
-  			}
-  		}
-  	}
+  	if (x.Connections[i]==y.Name && IsConnected == false) IsConnected = true;
   }
+
+  // Set the new connection from Room x TO Room y.
+  if (!IsConnected)
+  {
+	  for (i = 0; i < 7; ++i)
+	  {
+	  	if (UsedRooms[i].Name == x.Name)
+	  	{
+	  		for (k = 0; k < 6; ++k)
+	  		{
+	  			if (UsedRooms[i].Connections[k] == "")
+	  			{
+	  				UsedRooms[i].Connections[k] = y.Name;
+	  				break;
+	  			}
+	  		}
+	  	}
+	  }
+	}
 
   return;
 }
@@ -211,5 +238,9 @@ void ConnectRoom(struct Room x, struct Room y)
 // Returns true if Rooms x and y are the same Room, false otherwise
 bool IsSameRoom(struct Room x, struct Room y) 
 {
-  return (x.Name == y.Name);
+	bool ReturnVal = false;
+
+	if (x.Name == y.Name) ReturnVal=true;
+
+  return ReturnVal;
 }
