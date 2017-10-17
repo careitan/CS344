@@ -20,25 +20,22 @@ def randomChars(file_name):
 	output = bytearray(rand_list)
 	output.extend(b'\n')
 	print(bytearray(rand_list).decode("utf-8"))
-
+	f = open(file_name, 'w')
+	f.write(output.decode("utf-8"))
+	# Close the open file
+	f.close()
 
 files = ['Larry', 'Moe', 'Curley']
-
+# Make three function calls to each of the random generator and file creation.
 for i in files:
 	randomChars(i)
-# add a gap spacer for the number stuff
+
+# Make two variables and just enter random generated numbers.
+# Then print them out with the product between them.
 a=random.randrange(1, 43, 1)
 b=random.randrange(1, 43, 1)
 print(a)
 print(b)
 print(a*b)
 
-# Make three function calls to each of the random generator and file creation.
-
-
-# Make two variables and just enter random generated numbers.
-# Then print them out with the product between them.
-
 # Exit
-
-
