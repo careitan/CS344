@@ -31,6 +31,7 @@ struct Room {
 
 // Function Headers used this file.
 int DM_Friend(int min_num, int max_num);  // The Dungeon Master's Friend.
+int FindStringLength(char s[]);
 
 bool IsGraphFull();
 bool RoomExists(char* value);
@@ -112,6 +113,15 @@ int DM_Friend(int min_num, int max_num)
 
     result = (rand() % (hi_num - low_num)) + low_num;
     return result;
+}
+
+// Locate the end of the string in an array of chars for use as needed.
+int FindStringLength(char s[])
+{
+	int i=0;
+
+	while(s[i] != '\0') i++;
+	return i;
 }
 
 // Returns true if all rooms have 3 to 6 outbound connections, false otherwise
@@ -266,24 +276,24 @@ void WriteOutput(int pid)
 
 	// Prep for Loop
 	sprintf(directory, "reitanc.rooms.%i", pid);
-	result = mkdir(directory, 777);
+	result = mkdir(directory, 0777);
 
 	for (i = 0; i < 7; ++i)
 	{
 		//Start out creating the new folder and file object
 		sprintf(FileName, "%s/%s_room", directory, UsedRooms[i].Name);
-		if ((FileID = open(FileName, O_WRONLY | O_CREAT, 0766)) == -1)
+		if ((FileID = open(FileName, O_WRONLY | O_CREAT, 0777)) == -1)
 			printf("ERROR: WriteOut was unable to create file: %s", UsedRooms[i].Name);
-/*		// Write out the Room Name
+		// Write out the Room Name
 		sprintf(buf, "ROOM NAME: %s\n", UsedRooms[i].Name);
-		write(FileID, buf, 1024);
+		n_written = write(FileID, buf, FindStringLength(buf));
 		
 		// Write the Connection elements
-		for (j = 0; i < 6; ++j)
+		for (j = 0; j < 6; ++j)
 		{
 			if (UsedRooms[i].Connections[j] != "") {
-				sprintf(buf, "CONNECTION %i: %s\n", j, UsedRooms[i].Connections[j]);
-				write(FileID, buf, 1024);
+				sprintf(buf, "CONNECTION %i: %s\n", j+1, UsedRooms[i].Connections[j]);
+				n_written = write(FileID, buf, FindStringLength(buf));
 			}
 		}
  
@@ -299,8 +309,7 @@ void WriteOutput(int pid)
 				sprintf(buf, "ROOM TYPE: FINISH_ROOM");
 			break;
 		}
-*/
-		//write(FileID, buf, 1024);
+		n_written = write(FileID, buf, FindStringLength(buf));
 		close(FileID);
 	}
 
