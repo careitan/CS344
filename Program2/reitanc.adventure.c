@@ -70,19 +70,24 @@ typedef int bool;
 #define true  1
 #define false 0
 
+#define MAX_READ 256
+
 // Functions used to implement CS 344 - Program 2 assignment requirements
-void FindRoomsFiles(char s[]);
+void FindRoomsDir(char s[]);
+char* FindStartRoom(char s[]);
 char* GetRoomName(char RoomFile[]);
 char* GetRoomType(char RoomFile[]);
 char* GetRoomConnection(char RoomFile[], int ConnectionNumber);
-FILE* GetRoomFile(char RoomFile[]);
+int GetRoomFile(char RoomFile[]);
 bool IsValidConnection(char RoomFile[], char Move[]);
-bool ConnectionExists(char RoomFile[], int ConnNumber);
+bool ValidConnection(char RoomFile[], int ConnNumber);
 
 // Game control functions
 void RenderRoom(char RoomFile[]);
 bool IsGameOver(char RoomFile[]);
 
+// Tool or Assistance Functions
+void stripLeadingAndTrailingSpaces(char* string);
 
 int main(int argc, char* argv[])
 {
@@ -97,22 +102,62 @@ int main(int argc, char* argv[])
 	DynArr *Path;
 	Path = createDynArr(2);
 	int Steps_Taken = 0;
-	char CurrentRoomFile[256];
+	char *CurrentRoomFile;
+	int CurrentRoom;
 	bool IsGameOver = false;
+	char Buf[MAX_READ];
+	char RoomSuffix[] = "_room";
+
+	// DEBUG Operational Testing
+	//DIR* dirToCheck; // Holds the directory we're starting in
+	//struct dirent *fileInDir; // Holds the current subdir of the starting dir
+
 	
 	// Initialization of variables that require a non-null starting point.
 	memset(RoomDir, '\0', sizeof(RoomDir));
+	CurrentRoomFile = "";
 
-	FindRoomsFiles(RoomDir);
+	// Setup for the start of the game.
+	FindRoomsDir(RoomDir);
+	CurrentRoomFile = FindStartRoom(RoomDir);
 
+	
 
 	return 0;
 };
 
 // Functions used to implement CS 344 - Program 2 assignment requirements
 
+// Tool or Helper Functions
+// https://stackoverflow.com/questions/352055/best-algorithm-to-strip-leading-and-trailing-spaces-in-c
+void stripLeadingAndTrailingSpaces(char* string)
+{
+     assert(string);
+
+     /* First remove leading spaces */
+     const char* firstNonSpace = string;
+
+     while(*firstNonSpace != '\0' && isspace(*firstNonSpace))
+     {
+          ++firstNonSpace;
+     }
+
+     size_t len = strlen(firstNonSpace)+1;         
+     memmove(string, firstNonSpace, len);
+
+     /* Now remove trailing spaces */
+     char* endOfString = string + len;
+
+     while(string < endOfString  && isspace(*endOfString))
+     {
+          --endOfString ;
+     }
+     *endOfString = '\0';
+}
+
+
 // FindRoomsFiles - Find the most current directory based on File Mod property and populate the char array.
-void FindRoomsFiles(char s[])
+void FindRoomsDir(char s[])
 {
 	// Based on the code sample provided by CS344 Professor Benjamin Brewster
 	// https://oregonstate.instructure.com/courses/1648339/pages/2-dot-4-manipulating-directories
@@ -150,29 +195,188 @@ void FindRoomsFiles(char s[])
 	// printf("Newest entry found is: %s\n", s);
 }
 
+// Use this function to locate the Start Room and Populate the CurrentRoomFile Name Global to start the game.
+char* FindStartRoom(char s[])
+{
+	DIR* dirToCheck; // Holds the directory we're starting in
+	char targetFileSuffix[6] = "_room";
+	struct dirent *fileInDir; // Holds the current subdir of the starting dir
+	char *TestString;
+	TestString="";
+
+	char *ReturnVal;
+	ReturnVal="";
+
+	if (strlen(RoomDir) > 1)
+	{
+		dirToCheck = opendir(RoomDir);
+	}else if (strlen(s) > 1){
+		dirToCheck = opendir(s);
+	}
+
+	if (dirToCheck > 0) // Make sure the current directory could be opened
+	{
+	  while ((fileInDir = readdir(dirToCheck)) != NULL && strlen(ReturnVal) == 0) // Check each entry in dir
+	  {
+	  	TestString = fileInDir->d_name;
+	    if (strstr(TestString, targetFileSuffix) != NULL) // If entry has suffix
+	    {
+	      ReturnVal = (strcmp(GetRoomType(TestString),"START_ROOM") == 0) ? GetRoomName(TestString) : "";
+	    }
+	  }
+	}
+	closedir(dirToCheck); // Close the directory we opened
+
+	return ReturnVal;
+}
+
 // Functions to process the files for a room
 // Get the Room Type for a given room name.
 char* GetRoomName(char RoomFile[])
 {
 	char *ReturnVal;
+	char TestString[16] = "ROOM NAME";
+
+	// File descriptor of the room that will be rendered.
+	int RoomContents = GetRoomFile(RoomFile);
+	char Buffer[MAX_READ];
+	char *TempBuf;
+	char *pch;
+
+	if (RoomContents != -1)
+	{
+		memset(Buffer, '\0', sizeof(Buffer));
+		read(RoomContents, Buffer, MAX_READ);
+		close(RoomContents);
+
+		// Temp Element List to catch the Tokens.
+		// http://www.cplusplus.com/reference/cstring/strtok/
+		pch = strtok(Buffer, ":\n");
+
+		while(pch != NULL)
+		{
+			if (strcmp(pch , TestString) == 0)
+			{
+				pch = strtok(NULL, ":\n");
+				TempBuf="";
+				TempBuf=pch;
+				stripLeadingAndTrailingSpaces(TempBuf);
+				return ReturnVal = TempBuf;
+			}
+
+			// cut to the next element in the token list.
+			pch = strtok(NULL, ":\n");
+		}
+
+	}
+
 	return ReturnVal;
 }
 
 char* GetRoomType(char RoomFile[])
 {
 	char *ReturnVal;
+
+	// File descriptor of the room that will be rendered.
+	int RoomContents = GetRoomFile(RoomFile);
+	char Buffer[MAX_READ];
+	char *TempBuf;
+	char TestString[16] = "ROOM TYPE";
+	char *pch;
+
+	if (RoomContents != -1)
+	{
+		memset(Buffer, '\0', sizeof(Buffer));
+		read(RoomContents, Buffer, MAX_READ);
+		close(RoomContents);
+
+		// Temp Element List to catch the Tokens.
+		// http://www.cplusplus.com/reference/cstring/strtok/
+		pch = strtok(Buffer, ":\n");
+
+		while(pch != NULL)
+		{
+			if (strcmp(pch, TestString) == 0)
+			{
+				pch = strtok(NULL, ":\n");
+				TempBuf="";
+				TempBuf=pch;
+				stripLeadingAndTrailingSpaces(TempBuf);
+				return ReturnVal = TempBuf;
+			}
+
+			// cut to the next element in the token list.
+			pch = strtok(NULL, ":\n");
+		}
+
+	}
+
 	return ReturnVal;
 }
 
+// Use number 1 based for selecting the connection number.
 char* GetRoomConnection(char RoomFile[], int ConnectionNumber)
 {
 	char *ReturnVal;
+	char Buffer[MAX_READ];
+	char *TempBuf;
+	char TestString[strlen("CONNECTION 1")];
+	char *pch;
+
+	// File descriptor of the room that will be rendered.
+	int RoomContents = GetRoomFile(RoomFile);
+	memset(ReturnVal, '\0', 10);
+
+	if (RoomFile == "" || RoomFile == NULL) return ReturnVal = "";
+	ConnectionNumber = (ConnectionNumber < 1) ? 1 : ConnectionNumber;
+
+	if (RoomContents != -1)
+	{
+		memset(Buffer, '\0', sizeof(Buffer));
+		read(RoomContents, Buffer, MAX_READ);
+		close(RoomContents);
+
+		sprintf(TestString, "CONNECTION %i", ConnectionNumber);
+		// Temp Element List to catch the Tokens.
+		// http://www.cplusplus.com/reference/cstring/strtok/
+		pch = strtok(Buffer, ":\n");
+
+		while(pch != NULL)
+		{
+			if (strcmp(pch, TestString) == 0)
+			{
+				pch = strtok(NULL, ":\n");
+				TempBuf="";
+				TempBuf=pch;
+				stripLeadingAndTrailingSpaces(TempBuf);
+				return ReturnVal = TempBuf;
+			}
+
+			// cut to the next element in the token list.
+			pch = strtok(NULL, ":\n");
+		}
+	}
+
 	return ReturnVal;
 }
 
-FILE* GetRoomFile(char RoomFile[])
+int GetRoomFile(char RoomFile[])
 {
-	FILE* fil;
+	int fil;
+	char FilePath[sizeof(RoomDir) + strlen(RoomFile) + 1];
+	if (RoomFile == "" || RoomFile == NULL) return -1;
+
+	// Check to see if the room name passed in included the suffix '_room'.
+	// Actual file names will have '_room'
+	sprintf(FilePath, "%s/%s%s", RoomDir, RoomFile, strstr(RoomFile, "_room")==NULL ? "_room" : "");
+
+	// Open the File and return the File Descriptor Int to the calling process.
+	fil = open(FilePath, O_RDONLY);
+	if (fil == -1)
+	{
+		printf("ERROR - Unable to Open Room File: %s", RoomFile);
+	}
+
 	return fil;
 }
 
@@ -182,7 +386,7 @@ bool IsValidConnection(char RoomFile[], char Move[])
 	return ReturnVal;
 }
 
-bool ConnectionExists(char RoomFile[], int ConnNumber)
+bool ValidConnection(char RoomFile[], int ConnNumber)
 {
 	bool ReturnVal=false;
 	return ReturnVal;
@@ -192,12 +396,21 @@ bool ConnectionExists(char RoomFile[], int ConnNumber)
 // write out the content on the game screen to tell the user where they are and list options to move to.
 void RenderRoom(char RoomFile[])
 {
+	// File descriptor of the room that will be rendered.
+	int RoomContents = GetRoomFile(RoomFile);
 
+	if (RoomContents != -1)
+	{
+		// Start the process of reading and rendering the contents of the room.
+
+		// printf(" %s\n", );
+
+	}
 }
 
 bool IsGameOver(char RoomFile[])
 {
-	return (GetRoomType(RoomFile)=="FINISH_ROOM") ? true : false;
+	return (GetRoomType(RoomFile)=="END_ROOM") ? true : false;
 }
 
 /* ************************************************************************
