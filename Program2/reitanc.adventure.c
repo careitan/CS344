@@ -102,9 +102,10 @@ int main(int argc, char* argv[])
 	DynArr *Path;
 	Path = createDynArr(2);
 	int Steps_Taken = 0;
-	char *CurrentRoomFile;
+	char CurrentRoomFile[128];
 	int CurrentRoom;
 	bool IsGameOver = false;
+	bool IsValidMove = false;
 	char Buf[MAX_READ];
 	char RoomSuffix[] = "_room";
 
@@ -115,13 +116,13 @@ int main(int argc, char* argv[])
 	
 	// Initialization of variables that require a non-null starting point.
 	memset(RoomDir, '\0', sizeof(RoomDir));
-	CurrentRoomFile = "";
+	memset(CurrentRoomFile, '\0', sizeof(CurrentRoomFile));
 
 	// Setup for the start of the game.
 	FindRoomsDir(RoomDir);
-	CurrentRoomFile = FindStartRoom(RoomDir);
+	sprintf(CurrentRoomFile, FindStartRoom(RoomDir));
 
-	
+	RenderRoom(CurrentRoomFile);
 
 	return 0;
 };
@@ -320,12 +321,12 @@ char* GetRoomConnection(char RoomFile[], int ConnectionNumber)
 	char *ReturnVal;
 	char Buffer[MAX_READ];
 	char *TempBuf;
-	char TestString[strlen("CONNECTION 1")];
+	char TestString[32];
 	char *pch;
 
 	// File descriptor of the room that will be rendered.
 	int RoomContents = GetRoomFile(RoomFile);
-	memset(ReturnVal, '\0', 10);
+	ReturnVal="";
 
 	if (RoomFile == "" || RoomFile == NULL) return ReturnVal = "";
 	ConnectionNumber = (ConnectionNumber < 1) ? 1 : ConnectionNumber;
@@ -336,6 +337,7 @@ char* GetRoomConnection(char RoomFile[], int ConnectionNumber)
 		read(RoomContents, Buffer, MAX_READ);
 		close(RoomContents);
 
+		memset(TestString, '\0', sizeof(TestString));
 		sprintf(TestString, "CONNECTION %i", ConnectionNumber);
 		// Temp Element List to catch the Tokens.
 		// http://www.cplusplus.com/reference/cstring/strtok/
@@ -349,7 +351,8 @@ char* GetRoomConnection(char RoomFile[], int ConnectionNumber)
 				TempBuf="";
 				TempBuf=pch;
 				stripLeadingAndTrailingSpaces(TempBuf);
-				return ReturnVal = TempBuf;
+				printf("\nDEBUG - GetRoom is Returning:  %s", TempBuf);
+				return TempBuf;
 			}
 
 			// cut to the next element in the token list.
@@ -380,15 +383,44 @@ int GetRoomFile(char RoomFile[])
 	return fil;
 }
 
-bool IsValidConnection(char RoomFile[], char Move[])
+bool IsValidConnection(char RoomFile[], char *Move)
 {
-	bool ReturnVal=false;
+	bool ReturnVal = false;
+	char *TestVal;
+	int i;
+
+	// Loop through the Rooms to check and see what value is returned with each connection.
+	for (i = 1; i < 7; ++i)
+	{
+		TestVal = "";
+		TestVal = GetRoomConnection(RoomFile, i);
+		if (strlen(TestVal) != 0 && strcmp(TestVal, Move) == 0)
+		{
+			return true;
+		} else if (strlen(TestVal) == 0)
+		{
+			return false;
+		}
+	}
+
 	return ReturnVal;
 }
 
 bool ValidConnection(char RoomFile[], int ConnNumber)
 {
 	bool ReturnVal=false;
+	char *TestVal;
+
+	TestVal = "";
+	TestVal = GetRoomConnection(RoomFile, ConnNumber);
+	if (strlen(TestVal) != 0)
+	{
+		return true;
+	} else if (strlen(TestVal) == 0)
+	{
+		return false;
+	}
+
 	return ReturnVal;
 }
 
@@ -396,16 +428,41 @@ bool ValidConnection(char RoomFile[], int ConnNumber)
 // write out the content on the game screen to tell the user where they are and list options to move to.
 void RenderRoom(char RoomFile[])
 {
-	// File descriptor of the room that will be rendered.
-	int RoomContents = GetRoomFile(RoomFile);
+	// Iterator that will be used for going through the Connections.
+	int i;
+	char *TempString;
 
-	if (RoomContents != -1)
+	// Start the process of reading and rendering the contents of the room.
+	printf("\nCURRENT LOCATION: %s\n", GetRoomName(RoomFile));
+	
+	// Section to write out the Connections Choices.
+	printf("POSSIBLE CONNECTIONS: ");
+	for (i = 1; i < 7; ++i)
 	{
-		// Start the process of reading and rendering the contents of the room.
+		if (ValidConnection(RoomFile, i))
+		{
+			TempString = "";
+			TempString = GetRoomConnection(RoomFile, i);
+			// DEBUG
+			printf("\nDEBUG - RenderRoom TempString is Currently: %s\n", TempString);
 
-		// printf(" %s\n", );
-
+			/*
+			switch(i)
+			{
+				case 1:
+					printf("%s",TempString);
+				break;
+				default:
+					printf(", %s",TempString);
+				break;
+			}
+			*/
+		}
 	}
+	printf(".\n");
+
+	// Final Line on the Room Display.
+	printf("WHERE TO? >\n");
 }
 
 bool IsGameOver(char RoomFile[])
