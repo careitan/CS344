@@ -12,13 +12,16 @@
 #include <fcntl.h>
 #include <string.h>
 #include <math.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 // Global variables and definitions
 // Placing the key directory up here for efficiency of use
-char RoomDir[64];
+char RoomDir[64];	// buffer that holds the name of the current directory to use for the game.
+char *TempBuf;		// A Temporary string to be passed between the three helper functions for room lookup information.
 
 // Dynamic Array come from (Craig) Allan Reitan's work in CS 261 Data Structures.
 
@@ -85,6 +88,7 @@ bool ValidConnection(char RoomFile[], int ConnNumber);
 // Game control functions
 void RenderRoom(char RoomFile[]);
 bool IsGameOver(char RoomFile[]);
+int MakeTime();
 
 // Tool or Assistance Functions
 void stripLeadingAndTrailingSpaces(char* string);
@@ -121,6 +125,9 @@ int main(int argc, char* argv[])
 	// Setup for the start of the game.
 	FindRoomsDir(RoomDir);
 	sprintf(CurrentRoomFile, FindStartRoom(RoomDir));
+
+
+	MakeTime();
 
 	RenderRoom(CurrentRoomFile);
 
@@ -241,7 +248,6 @@ char* GetRoomName(char RoomFile[])
 	// File descriptor of the room that will be rendered.
 	int RoomContents = GetRoomFile(RoomFile);
 	char Buffer[MAX_READ];
-	char *TempBuf;
 	char *pch;
 
 	if (RoomContents != -1)
@@ -281,7 +287,6 @@ char* GetRoomType(char RoomFile[])
 	// File descriptor of the room that will be rendered.
 	int RoomContents = GetRoomFile(RoomFile);
 	char Buffer[MAX_READ];
-	char *TempBuf;
 	char TestString[16] = "ROOM TYPE";
 	char *pch;
 
@@ -320,7 +325,6 @@ char* GetRoomConnection(char RoomFile[], int ConnectionNumber)
 {
 	char *ReturnVal;
 	char Buffer[MAX_READ];
-	char *TempBuf;
 	char TestString[32];
 	char *pch;
 
@@ -328,7 +332,7 @@ char* GetRoomConnection(char RoomFile[], int ConnectionNumber)
 	int RoomContents = GetRoomFile(RoomFile);
 	ReturnVal="";
 
-	if (RoomFile == "" || RoomFile == NULL) return ReturnVal = "";
+	if (strcmp(RoomFile, "") == 0 || RoomFile == NULL) return ReturnVal = "";
 	ConnectionNumber = (ConnectionNumber < 1) ? 1 : ConnectionNumber;
 
 	if (RoomContents != -1)
@@ -351,8 +355,9 @@ char* GetRoomConnection(char RoomFile[], int ConnectionNumber)
 				TempBuf="";
 				TempBuf=pch;
 				stripLeadingAndTrailingSpaces(TempBuf);
-				printf("\nDEBUG - GetRoom is Returning:  %s", TempBuf);
-				return TempBuf;
+				// printf("\nDEBUG - GetRoom is Returning:  %s", TempBuf);
+				ReturnVal = TempBuf;
+				return ReturnVal;
 			}
 
 			// cut to the next element in the token list.
@@ -366,8 +371,9 @@ char* GetRoomConnection(char RoomFile[], int ConnectionNumber)
 int GetRoomFile(char RoomFile[])
 {
 	int fil;
+
 	char FilePath[sizeof(RoomDir) + strlen(RoomFile) + 1];
-	if (RoomFile == "" || RoomFile == NULL) return -1;
+	if (strcmp(RoomFile,"") == 0 || RoomFile == NULL) return -1;
 
 	// Check to see if the room name passed in included the suffix '_room'.
 	// Actual file names will have '_room'
@@ -413,10 +419,10 @@ bool ValidConnection(char RoomFile[], int ConnNumber)
 
 	TestVal = "";
 	TestVal = GetRoomConnection(RoomFile, ConnNumber);
-	if (strlen(TestVal) != 0)
+	if (strlen(TestVal) != 0 && strcmp(TestVal,"") != 0)
 	{
 		return true;
-	} else if (strlen(TestVal) == 0)
+	} else if (strlen(TestVal) == 0 || strcmp(TestVal,"") == 0)
 	{
 		return false;
 	}
@@ -430,7 +436,8 @@ void RenderRoom(char RoomFile[])
 {
 	// Iterator that will be used for going through the Connections.
 	int i;
-	char *TempString;
+	char TestVal[64];
+	bool IsConnValid = false;
 
 	// Start the process of reading and rendering the contents of the room.
 	printf("\nCURRENT LOCATION: %s\n", GetRoomName(RoomFile));
@@ -439,24 +446,21 @@ void RenderRoom(char RoomFile[])
 	printf("POSSIBLE CONNECTIONS: ");
 	for (i = 1; i < 7; ++i)
 	{
-		if (ValidConnection(RoomFile, i))
+		IsConnValid = ValidConnection(RoomFile, i);
+		if (IsConnValid)
 		{
-			TempString = "";
-			TempString = GetRoomConnection(RoomFile, i);
-			// DEBUG
-			printf("\nDEBUG - RenderRoom TempString is Currently: %s\n", TempString);
+			memset(TestVal,'\0', 64);
+			sprintf(TestVal, "%s", GetRoomConnection(RoomFile, i));
 
-			/*
 			switch(i)
 			{
 				case 1:
-					printf("%s",TempString);
+					printf("%s",TestVal);
 				break;
 				default:
-					printf(", %s",TempString);
+					printf(", %s",TestVal);
 				break;
 			}
-			*/
 		}
 	}
 	printf(".\n");
@@ -468,6 +472,49 @@ void RenderRoom(char RoomFile[])
 bool IsGameOver(char RoomFile[])
 {
 	return (GetRoomType(RoomFile)=="END_ROOM") ? true : false;
+}
+
+// The timer function that is used with the MUTEX implementation to demonstrate a second thread.
+// When user types a move of 'time', this function will be started up on the second thread and do the following:
+// 1. Populate a string with the system time.
+// 2. Print it out on the screen.
+// 3. Write it out to a local file called 'currentTime.txt'
+// REF: http://www.cplusplus.com/reference/ctime/localtime/
+int MakeTime()
+{
+  time_t rawtime;
+  struct tm * timeinfo;
+  int year, month ,day;
+  const char * weekday[] = { "Sunday", "Monday",
+                             "Tuesday", "Wednesday",
+                             "Thursday", "Friday", "Saturday"};
+  const char * month_name[] = {"January", "February", "March", "April",
+							"May", "June", "July", "August",
+							"September", "October", "November", "December"};
+  char LongDateString[100] = "";
+  int FileID;
+
+  time (&rawtime);
+  timeinfo = localtime (&rawtime);
+
+  sprintf(LongDateString, " %.2d:%.2d%s , %s, %s %3d, %d\n",
+  	((timeinfo->tm_hour-11)>0)?timeinfo->tm_hour-12 : timeinfo->tm_hour, timeinfo->tm_min, ((timeinfo->tm_hour-11)>0)?"pm":"am",
+  	weekday[timeinfo->tm_wday], month_name[timeinfo->tm_mon], timeinfo->tm_mday, 
+  	1900+timeinfo->tm_year);
+  printf("\n%s\n", LongDateString);
+
+  FileID = open("currentTime.txt", O_WRONLY | O_CREAT, 0766);
+
+  if (FileID != -1)
+  {
+  	write(FileID, asctime(timeinfo), strlen(asctime(timeinfo)));
+  	close(FileID);
+  }else{
+  	printf("ERROR: Unable to open the file currentTime.txt for writing.");
+  	return 1;
+  }
+
+  return 0;
 }
 
 /* ************************************************************************
