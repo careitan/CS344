@@ -30,7 +30,9 @@ typedef int bool;
 char RoomDir[64];	// buffer that holds the name of the current directory to use for the game.
 char *TempBuf;		// A Temporary string to be passed between the three helper functions for room lookup information.
 char WriteBuf[MAX_READ]; // A Temporary string to be used for staging content for writing out to the Path file.
-char PathStr[MAX_READBACK];
+char PathStr[MAX_READBACK]; // The temporary string that will read in all of the path steps for the output rendering.
+pthread_mutex_t GameMutex; // The Mutex that will be used as the Locking plane.
+char TempFile[] = "Pathfile"; // The path output file.
 
 // Functions used to implement CS 344 - Program 2 assignment requirements
 void FindRoomsDir(char s[]);
@@ -43,17 +45,17 @@ bool IsValidConnection(char RoomFile[], char Move[]);
 bool ValidConnection(char RoomFile[], int ConnNumber);
 
 // Game control functions
-void RenderRoom(char RoomFile[]);
+int RenderRoom(char RoomFile[]);
 bool IsGameOver(char RoomFile[]);
 int CreatePath(char RoomFile[], char FileName[]);
 int WritePath(char RoomFile[], char FileName[]);
-int MakeTime();
+int MakeTime(void *my_mutex);
 void RenderGameOver(int Steps, char Path[]);
 
 // Tool or Assistance Functions
 void stripLeadingAndTrailingSpaces(char* string);
 
-int main(int argc, char* argv[])
+int main(void)
 {
 	// Initialize Variables to be used in the program
 	/******
@@ -65,40 +67,28 @@ int main(int argc, char* argv[])
 	IsGameOver:			True / False 'nuff said.
 
 	*******/
-	int Steps_Taken;
-	char TempFile[] = "Pathfile";
-	int TempFileID;
+	int i;
+	int Steps_Taken = 0;
 	char CurrentRoomFile[128];
-	int CurrentRoom;
-	bool GameOver = false;
-	bool IsValidMove = false;
-	char Buf[MAX_READ];				// Dynamic array for holding characters as needed for processing.
-	char EvalString[MAX_READ]; 		// Dynamic array for holding characters as needed for processing.
 	char RoomSuffix[] = "_room"; 	// Used to quickly append to the CurrentRoomFile to get the file name.
 
 	// Going to use for holding the two threads we use for this program.
 	// Element 0 will be the program thread that is going to write to Pathfile.
 	// Element 1 will be the timer when it is called.
-	/*
 	int pthreadResult;
 	pthread_t Threads[2];
-	pthread_t MainThreadID, TimerThreadID;
-	char 
-
-	MainThreadID = pthread_self();
-	Threads[0] = MainThreadID;
-
-	pthreadResult = pthread_create(&TimerThreadID, NULL, MakeTime, NULL);
-	if (pthreadResult == 0) Threads[1]=TimerThreadID;
-
-	pthread_mutex_t GameMutex = PTHREAD_MUTEX_INITIALIZER;
-	// End setup of the Thread function and operations.
-*/
-	// DEBUG Operational Testing
+	pthread_mutex_init(&GameMutex, NULL);
+	// *************************************
 
 	// Initialization of variables that require a non-null starting point.
 	memset(RoomDir, '\0', sizeof(RoomDir));
 	memset(CurrentRoomFile, '\0', sizeof(CurrentRoomFile));
+
+	// Thread setup and synchronization.
+	pthreadResult = pthread_create(&Threads[0], NULL, (void*)&FindRoomsDir, (void*)&RoomDir);
+	// pthreadResult = pthread_create(&Threads[0], NULL, (void*)&RenderRoom, (void*)&CurrentRoomFile);
+	// pthreadResult = pthread_create(&Threads[0], NULL, (void*)&main, NULL);
+	assert(0 == pthreadResult);
 
 	// Setup for the start of the game.
 	FindRoomsDir(RoomDir);
@@ -107,12 +97,22 @@ int main(int argc, char* argv[])
 	// Put Start Room on the PATH Stack.
 	CreatePath(CurrentRoomFile, TempFile);
 
+	pthread_mutex_lock(&GameMutex);
+	pthreadResult = pthread_create(&Threads[1], NULL, (void*)&MakeTime, &GameMutex);
+	assert(0 == pthreadResult);
+	// End setup of the Thread function and operations.
+
 	// Starting the game up
 	Steps_Taken=0;
+
+	pthread_mutex_unlock(&GameMutex);
+	Steps_Taken=RenderRoom(CurrentRoomFile);
+
+	/*
 	do
 	{
 		// Arrival in room.
-		RenderRoom(CurrentRoomFile);
+		// RenderRoom(CurrentRoomFile);
 
 		// Get user input for room move
 		memset(Buf,'\0', sizeof(Buf));
@@ -124,7 +124,6 @@ int main(int argc, char* argv[])
 
 		if (strcmp(Buf,"time")==0)
 		{
-			// TODO: Process time input and mutex.
 			MakeTime();
 		}else if (IsValidConnection(CurrentRoomFile, EvalString))
 		{
@@ -144,12 +143,13 @@ int main(int argc, char* argv[])
 			printf("\nHAL 9000 SAYS, \'I'M SORRY I AM AFRAID I JUST CAN\'T DO THAT.\'  TRY AGAIN.\n");
 		}
 	} while (GameOver == false);
+	*/
 
 	RenderGameOver(Steps_Taken, TempFile);
 
 	remove(TempFile);
 
-	//pthread_mutex_destroy(&GameMutex);
+	pthread_mutex_destroy(&GameMutex);
 
 	return 0;
 };
@@ -196,6 +196,7 @@ void FindRoomsDir(char s[])
 	struct dirent *fileInDir; // Holds the current subdir of the starting dir
 	struct stat dirAttributes; // Holds information we've gained about subdir	
 
+	pthread_mutex_lock(&GameMutex);
 	dirToCheck = opendir("."); // Open up the directory this program was run in
 
 	if (dirToCheck > 0) // Make sure the current directory could be opened
@@ -218,6 +219,7 @@ void FindRoomsDir(char s[])
 	  }
 	}
 	closedir(dirToCheck); // Close the directory we opened
+	pthread_mutex_unlock(&GameMutex);
 
 	// printf("Newest entry found is: %s\n", s);
 }
@@ -451,41 +453,86 @@ bool ValidConnection(char RoomFile[], int ConnNumber)
 
 // Game control functions
 // write out the content on the game screen to tell the user where they are and list options to move to.
-void RenderRoom(char RoomFile[])
+int RenderRoom(char RoomFile[])
 {
 	// Iterator that will be used for going through the Connections.
+	int ReturnVal=0;
 	int i;
 	char TestVal[64];
 	bool IsConnValid = false;
+	char CurrentRoomFile[128];
+	int CurrentRoom;
+	bool GameOver = false;
+	bool IsValidMove = false;
+	char Buf[MAX_READ];				// Dynamic array for holding characters as needed for processing.
+	char EvalString[MAX_READ]; 		// Dynamic array for holding characters as needed for processing.
 
 	// Start the process of reading and rendering the contents of the room.
-	printf("\nCURRENT LOCATION: %s\n", GetRoomName(RoomFile));
-	
-	// Section to write out the Connections Choices.
-	printf("POSSIBLE CONNECTIONS: ");
-	for (i = 1; i < 7; ++i)
-	{
-		IsConnValid = ValidConnection(RoomFile, i);
-		if (IsConnValid)
-		{
-			memset(TestVal,'\0', 64);
-			sprintf(TestVal, "%s", GetRoomConnection(RoomFile, i));
+	sprintf(CurrentRoomFile, "%s", RoomFile);
 
-			switch(i)
+	do{
+		printf("\nCURRENT LOCATION: %s\n", GetRoomName(CurrentRoomFile));
+		
+		// Section to write out the Connections Choices.
+		printf("POSSIBLE CONNECTIONS: ");
+		for (i = 1; i < 7; ++i)
+		{
+			IsConnValid = ValidConnection(CurrentRoomFile, i);
+			if (IsConnValid)
 			{
-				case 1:
-					printf("%s",TestVal);
-				break;
-				default:
-					printf(", %s",TestVal);
-				break;
+				memset(TestVal,'\0', 64);
+				sprintf(TestVal, "%s", GetRoomConnection(CurrentRoomFile, i));
+
+				switch(i)
+				{
+					case 1:
+						printf("%s",TestVal);
+					break;
+					default:
+						printf(", %s",TestVal);
+					break;
+				}
 			}
 		}
-	}
-	printf(".\n");
+		printf(".\n");
 
-	// Final Line on the Room Display.
-	printf("WHERE TO? >");
+		// Final Line on the Room Display.
+		printf("WHERE TO? >");
+
+			// Get user input for room move
+			memset(Buf,'\0', sizeof(Buf));
+			scanf("%s", Buf);
+
+			// Process user input into a string array for passing around in functions if needed.
+			memset(EvalString,'\0', sizeof(EvalString));
+			sprintf(EvalString, Buf);
+
+			if (strcmp(Buf,"time")==0)
+			{
+				pthread_mutex_unlock(&GameMutex);
+				MakeTime(&GameMutex);
+				pthread_mutex_lock(&GameMutex);
+			}else if (IsValidConnection(CurrentRoomFile, EvalString))
+			{
+				// Room is valid for moving and set the next step.
+				memset(CurrentRoomFile, '\0', sizeof(CurrentRoomFile));
+				sprintf(CurrentRoomFile,"%s", EvalString);
+
+				// Add room to the PATH and update step count.
+				WritePath(CurrentRoomFile, TempFile);
+				ReturnVal++;
+
+				// Check for GAME OVER, and set flag for while loop.
+				GameOver = IsGameOver(CurrentRoomFile);
+			}else
+			{
+				// User inputed something that didn't match.
+				printf("\nHAL 9000 SAYS, \'I'M SORRY I AM AFRAID I JUST CAN\'T DO THAT.\'  TRY AGAIN.\n");
+			}
+
+	}while (GameOver == false);
+
+	return ReturnVal;
 }
 
 // Just check and see if the room moving into is an END_ROOM
@@ -564,7 +611,7 @@ void RenderGameOver(int Steps, char Path[])
 // 2. Print it out on the screen.
 // 3. Write it out to a local file called 'currentTime.txt'
 // REF: http://www.cplusplus.com/reference/ctime/localtime/
-int MakeTime()
+int MakeTime(void *my_mutex)
 {
   time_t rawtime;
   struct tm * timeinfo;
@@ -577,6 +624,8 @@ int MakeTime()
 
   printf("\n%s\n", LongDateString);
 
+  pthread_mutex_lock(my_mutex);
+
   FileID = open("currentTime.txt", O_WRONLY | O_CREAT, 0766);
 
   if (FileID != -1)
@@ -587,6 +636,8 @@ int MakeTime()
   	printf("ERROR: Unable to open the file currentTime.txt for writing.");
   	return 1;
   }
+
+  pthread_mutex_unlock(my_mutex);
 
   return 0;
 }
