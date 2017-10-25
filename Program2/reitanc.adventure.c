@@ -23,51 +23,131 @@
 char RoomDir[64];	// buffer that holds the name of the current directory to use for the game.
 char *TempBuf;		// A Temporary string to be passed between the three helper functions for room lookup information.
 
-// Dynamic Array come from (Craig) Allan Reitan's work in CS 261 Data Structures.
-
-#ifndef DYNAMIC_ARRAY_INCLUDED
-#define DYNAMIC_ARRAY_INCLUDED 1
+// Linked List Deque comes from (Craig) Allan Reitan's work in CS 261 Data Structures.
+#ifndef __LISTDEQUE_H
+#define __LISTDEQUE_H
 
 # ifndef TYPE
-# define TYPE     char *
+# define TYPE      char *
 # define TYPE_SIZE sizeof(char)
+# endif
+# ifndef LT
+# define LT(A, B) ((A) < (B))
 # endif
 
 # ifndef EQ
-# define EQ(A, B) (fabs(A - B) < 10e-7)
+# define EQ(A, B) ((A) == (B))
 # endif
 
-typedef struct DynArr DynArr;
-struct DynArr
-{
-	TYPE *data;		/* pointer to the data array */
-	int size;		/* Number of elements in the array */
-	int capacity;	/* capacity ofthe array */
+/* Double Link*/
+struct DLink {
+	TYPE value;
+	struct DLink * next;
+	struct DLink * prev;
 };
 
+struct linkedList{
+	int size;
+	struct DLink *firstLink;
+	struct DLink *lastLink;
+};
 
-DynArr *createDynArr(int cap);
-void deleteDynArr(DynArr *v);
+struct linkedList *createLinkedList();
 
-int sizeDynArr(DynArr *v);
+/* Deque Interface */
+int 	isEmptyList(struct linkedList *lst);
+void  addBackList(struct linkedList *lst, TYPE e);
+void 	addFrontList(struct linkedList *lst, TYPE e);
 
-void addDynArr(DynArr *v, TYPE val);
-TYPE getDynArr(DynArr *v, int pos);
-void putDynArr(DynArr *v, int pos, TYPE val);
-void swapDynArr(DynArr *v, int i, int  j);
-void removeAtDynArr(DynArr *v, int idx);
+TYPE  frontList(struct linkedList *lst);
+TYPE 	backList(struct linkedList *lst);
 
-/* Stack interface. */
-int isEmptyDynArr(DynArr *v);
-void pushDynArr(DynArr *v, TYPE val);
-TYPE topDynArr(DynArr *v);
-void popDynArr(DynArr *v);
+void  removeFrontList(struct linkedList *lst);
+void 	removeBackList(struct linkedList *lst);
 
-/* Bag Interface */
-int containsDynArr(DynArr *v, TYPE val);
-void removeDynArr(DynArr *v, TYPE val);
+void  DisplayList(struct linkedList* lst);
+void  _printList(struct linkedList* lst);
+
+/*Bag Interface */
+void addList(struct linkedList *lst, TYPE v);
+int containsList(struct linkedList *lst, TYPE e);
+void removeList(struct linkedList *lst, TYPE e);
 
 #endif
+
+// DoubleLinked List from GitHub.com
+// https://gist.github.com/mycodeschool/7429492
+
+struct Node  {
+	char* data;
+	struct Node* next;
+	struct Node* prev;
+};
+
+struct Node* head; // global variable - pointer to head node.
+
+//Creates a new Node and returns pointer to it. 
+struct Node* GetNewNode(char* x) {
+	struct Node* newNode
+		= (struct Node*)malloc(sizeof(struct Node));
+	newNode->data = x;
+	newNode->prev = NULL;
+	newNode->next = NULL;
+	return newNode;
+}
+
+//Inserts a Node at head of doubly linked list
+void InsertAtHead(char* x) {
+	struct Node* newNode = GetNewNode(x);
+	if(head == NULL) {
+		head = newNode;
+		return;
+	}
+	head->prev = newNode;
+	newNode->next = head; 
+	head = newNode;
+}
+
+//Inserts a Node at tail of Doubly linked list
+void InsertAtTail(char* x) {
+	struct Node* temp = head;
+	struct Node* newNode = GetNewNode(x);
+	if(head == NULL) {
+		head = newNode;
+		return;
+	}
+	while(temp->next != NULL) temp = temp->next; // Go To last Node
+	temp->next = newNode;
+	newNode->prev = temp;
+}
+
+//Prints all the elements in linked list in forward traversal order
+void Print() {
+	struct Node* temp = head;
+	// printf("Forward: ");
+	while(temp != NULL) {
+		printf("%s\n",temp->data);
+		temp = temp->next;
+	}
+	//printf("\n");
+}
+
+//Prints all elements in linked list in reverse traversal order. 
+void ReversePrint() {
+	struct Node* temp = head;
+	if(temp == NULL) return; // empty list, exit
+	// Going to last Node
+	while(temp->next != NULL) {
+		temp = temp->next;
+	}
+	// Traversing backward using prev pointer
+	// printf("Reverse: ");
+	while(temp != NULL) {
+		printf("%s\n",temp->data);
+		temp = temp->prev;
+	}
+	// printf("\n");
+}
 
 typedef int bool;
 #define true  1
@@ -89,7 +169,8 @@ bool ValidConnection(char RoomFile[], int ConnNumber);
 void RenderRoom(char RoomFile[]);
 bool IsGameOver(char RoomFile[]);
 int MakeTime();
-void RenderGameOver(DynArr *v, int Steps);
+void RenderGameOver(struct linkedList *lst);
+void RenderGameEnd(int Steps);
 
 // Tool or Assistance Functions
 void stripLeadingAndTrailingSpaces(char* string);
@@ -104,15 +185,18 @@ int main(int argc, char* argv[])
 	IsGameOver:	True / False 'nuff said.
 
 	*******/
-	DynArr *Path;
-	Path = createDynArr(2);
-	int Steps_Taken = 0; 		// Should always be one step less than the number of elements in path.
+	/*
+	struct linkedList* Path;
+	Path = createLinkedList();
+	*/
+	head = NULL;
+	int Steps_Taken;
 	char CurrentRoomFile[128];
 	int CurrentRoom;
 	bool GameOver = false;
 	bool IsValidMove = false;
 	char Buf[MAX_READ];			// Dynamic array for holding characters as needed for processing.
-	char TestString[MAX_READ];  // Dynamic array for holding characters as needed for processing.
+	char EvalString[MAX_READ];  // Dynamic array for holding characters as needed for processing.
 	char RoomSuffix[] = "_room";
 
 	// Going to use for holding the two threads we use for this program.
@@ -141,43 +225,49 @@ int main(int argc, char* argv[])
 
 	// Setup for the start of the game.
 	FindRoomsDir(RoomDir);
-	sprintf(CurrentRoomFile, FindStartRoom(RoomDir));
+	sprintf(CurrentRoomFile, "%s", FindStartRoom(RoomDir));
 
 	// Put Start Room on the PATH Stack.
-	pushDynArr(Path, CurrentRoomFile);
+	InsertAtTail(CurrentRoomFile);
+	// addBackList(Path, CurrentRoomFile);
 
 	// Starting the game up
+	Steps_Taken=0;
 	do
 	{
+
 		RenderRoom(CurrentRoomFile);
 		// TODO: SCANF Processing of typed input.
 		memset(Buf,'\0', sizeof(Buf));
 		scanf("%s", Buf);
-		memset(TestString,'\0', sizeof(TestString));
-		sprintf(TestString, Buf);
+		memset(EvalString,'\0', sizeof(EvalString));
+		sprintf(EvalString, Buf);
 
 		if (strcmp(Buf,"time")==0)
 		{
 			// TODO: Process time input and mutex.
 			MakeTime();
-		}else if (IsValidConnection(CurrentRoomFile, TestString))
+		}else if (IsValidConnection(CurrentRoomFile, EvalString))
 		{
 			// TODO: If Valid Move push onto Path.
 			// TODO: Check if room moving to is going to be end room.
 			memset(CurrentRoomFile, '\0', sizeof(CurrentRoomFile));
-			sprintf(CurrentRoomFile,"%s", TestString);
+			sprintf(CurrentRoomFile,"%s", EvalString);
 
 			// Add room to the PATH and update count.
-			pushDynArr(Path, CurrentRoomFile);
+			// addBackList(Path, CurrentRoomFile);
+			InsertAtTail(CurrentRoomFile);
 			Steps_Taken++;
 
 			// Check for GAME OVER.
 			GameOver = IsGameOver(CurrentRoomFile);
 		}else
 		{
-			printf("HAL 9000 SAYS, \'I'M SORRY I AM AFRAID I JUST CAN\'T DO THAT.\'  TRY AGAIN.\n");
+			printf("\nHAL 9000 SAYS, \'I'M SORRY I AM AFRAID I JUST CAN\'T DO THAT.\'  TRY AGAIN.\n");
 		}
-	} while (GameOver = false);
+	} while (GameOver == false);
+
+	// RenderGameOver(Path);
 
 	//pthread_mutex_destroy(&GameMutex);
 
@@ -521,25 +611,29 @@ void RenderRoom(char RoomFile[])
 // Just check and see if the room moving into is an END_ROOM
 bool IsGameOver(char RoomFile[])
 {
-	return (GetRoomType(RoomFile)=="END_ROOM") ? true : false;
+	return (strcmp(GetRoomType(RoomFile),"END_ROOM") == 0) ? true : false;
 }
 
-//
-void RenderGameOver(DynArr *v, int Steps)
+// Function to write out the message at the end of the game.
+void RenderGameOver(struct linkedList *lst)
 {
-	assert(v);
-	assert(Steps);
+	assert(lst);
 	int i;
 
 	printf("\nYOU HAVE FOUND THE END ROOM. CONGRATULATIONS!\n");
-	printf("YOU TOOK %d STEP%s.  YOUR PATH TO VICTORY WAS:\n", Steps, (Steps > 1) ? "S" : "");
-
-	for (i = 0; i < Steps+1; ++i)
-	{
-		printf("%s\n", getDynArr(v, i));
-	}
+	printf("YOU TOOK %d STEP%s.  YOUR PATH TO VICTORY WAS:\n", lst->size-1, ((lst->size-1) > 1) ? "S" : "");
+	DisplayList(lst);
+	_printList(lst);
 
 	return;
+}
+
+// Alternate function to support the simpler Deque
+void RenderGameEnd(int Steps)
+{
+	printf("\nYOU HAVE FOUND THE END ROOM. CONGRATULATIONS!\n");
+	printf("YOU TOOK %d STEP%s.  YOUR PATH TO VICTORY WAS:\n", Steps, (Steps > 1) ? "S" : "");
+
 }
 
 // The timer function that is used with the MUTEX implementation to demonstrate a second thread.
@@ -571,7 +665,7 @@ int MakeTime()
   	weekday[timeinfo->tm_wday], month_name[timeinfo->tm_mon], timeinfo->tm_mday, 
   	1900+timeinfo->tm_year);
   */
-  strftime(LongDateString, 100, " %I:%M%p , %A, %B %d, %Y", timeinfo);
+  strftime(LongDateString, 100, " %I:%M%p, %A, %B %d, %Y", timeinfo);
 
   printf("\n%s\n", LongDateString);
 
@@ -590,336 +684,399 @@ int MakeTime()
 }
 
 /* ************************************************************************
-	Dynamic Array Functions - From CS 261
+	LL Deque Functions - From CS 261
 ************************************************************************ */
 
-/* Initialize (including allocation of data array) dynamic array.
-	param: 	v		pointer to the dynamic array
-	param:	cap 	capacity of the dynamic array
-	pre:	v is not null
-	post:	internal data array can hold cap elements
-	post:	v->data is not null
+/*
+	initList
+	param lst the linkedList
+	pre: lst is not null
+	post: lst size is 0
 */
-void initDynArr(DynArr *v, int capacity)
-{
-	assert(capacity > 0);
-	assert(v!= 0);
-	v->data = (TYPE *) malloc(sizeof(TYPE) * capacity);
-	assert(v->data != 0);
-	v->size = 0;
-	v->capacity = capacity;	
+
+void _initList (struct linkedList *lst) {
+	lst->size = 0;
+	lst->firstLink = NULL;
+	lst->lastLink = NULL;
 }
 
-/* Allocate and initialize dynamic array.
-	param:	cap 	desired capacity for the dyn array
-	pre:	none
-	post:	none
-	ret:	a non-null pointer to a dynArr of cap capacity
-			and 0 elements in it.		
-*/
-DynArr* createDynArr(int cap)
+/*
+ createList
+ param: none
+ pre: none
+ post: firstLink and lastLink reference sentinels
+ */
+
+struct linkedList *createLinkedList()
 {
-	assert(cap > 0);
-	DynArr *r = (DynArr *)malloc(sizeof( DynArr));
-	assert(r != 0);
-	initDynArr(r,cap);
-	return r;
+	struct linkedList *newList = malloc(sizeof(struct linkedList));
+	_initList(newList);
+	return(newList);
 }
 
-/* Deallocate data array in dynamic array. 
-	param: 	v		pointer to the dynamic array
-	pre:	none
-	post:	d.data points to null
-	post:	size and capacity are 0
-	post:	the memory used by v->data is freed
+/*
+	_addLinkBeforeBefore
+	param: lst the linkedList
+	param: l the  link to add before
+	param: v the value to add
+	pre: lst is not null
+	pre: l is not null
+	post: lst is not empty
 */
-void freeDynArr(DynArr *v)
+
+/* Adds Before the provided link, l */
+
+void _addLinkBefore(struct linkedList *lst, struct DLink *l, TYPE v)
 {
-	if(v->data != 0)
+	assert(lst != NULL);
+	assert(l != NULL);
+
+	struct DLink *NewLink = malloc(sizeof(struct DLink));
+
+	//Set values for new link
+	NewLink->value = v;
+
+	if (lst->firstLink == l)
 	{
-		free(v->data); 	/* free the space on the heap */
-		v->data = 0;   	/* make it point to null */
+		//DLink is the first value in the link list.
+		NewLink->prev = NULL;
+		NewLink->next = l;
+
+		//Adjust the former first link prev to NewLink.
+		l->prev = NewLink;
+
+		//Update the LinkList to include the new link.
+		lst->firstLink = NewLink;
+		lst->size++;
 	}
-	v->size = 0;
-	v->capacity = 0;
-}
-
-/* Deallocate data array and the dynamic array ure. 
-	param: 	v		pointer to the dynamic array
-	pre:	none
-	post:	the memory used by v->data is freed
-	post:	the memory used by d is freed
-*/
-void deleteDynArr(DynArr *v)
-{
-	freeDynArr(v);
-	free(v);
-}
-
-/* Resizes the underlying array to be the size cap 
-	param: 	v		pointer to the dynamic array
-	param:	cap		the new desired capacity
-	pre:	v is not null
-	post:	v has capacity newCap
-*/
-void _dynArrSetCapacity(DynArr *v, int newCap)
-{	
-	// For non -C99 compiles
-	int i;
-	/* FIXME: You will write this function */
-	assert(v->size - 1 < newCap);
-	TYPE *NewType = malloc(sizeof(TYPE) * newCap);
-	assert(NewType);
-
-	// capture the current size of the preserved content
-	int Size = v->size;
-
-	for (i = 0; i < Size; i++)
+	else
 	{
-		// Preserve current values in array
-		NewType[i] = v->data[i];
-	}
-	// release Memory of old array
-	freeDynArr(v);
-	// Add back in the newly created pointer to data.
-	v->data = NewType;
-	v->size = Size;
-	v->capacity = newCap;
-}
+		//GO FISH - have to find the link that you will be inserting.
+		struct DLink *Current = lst->firstLink;
 
-/* Get the size of the dynamic array
-	param: 	v		pointer to the dynamic array
-	pre:	v is not null
-	post:	none
-	ret:	the size of the dynamic array
-*/
-int sizeDynArr(DynArr *v)
-{
-	return v->size;
-}
-
-/* 	Adds an element to the end of the dynamic array
-	param: 	v		pointer to the dynamic array
-	param:	val		the value to add to the end of the dynamic array
-	pre:	the dynArry is not null
-	post:	size increases by 1
-	post:	if reached capacity, capacity is doubled
-	post:	val is in the last utilized pos in the array
-*/
-void addDynArr(DynArr *v, TYPE val)
-{
-	/* FIXME: You will write this function */
-	/* Check to see if a resize is necessary */
-	if (v->size + 1 >= v->capacity)
-		_dynArrSetCapacity(v, 2 * v->capacity);
-
-	v->data[v->size] = val;
-	v->size++;
-}
-
-/*	Get an element from the dynamic array from a specified pos
-	
-	param: 	v		pointer to the dynamic array
-	param:	pos		integer index to get the element from
-	pre:	v is not null
-	pre:	v is not empty
-	pre:	pos < size of the dyn array and >= 0
-	post:	no changes to the dyn Array
-	ret:	value stored at index pos
-*/
-
-TYPE getDynArr(DynArr *v, int pos)
-{
-	assert(v->data[pos]);
-	assert(v->data[pos] != 0);
-	assert(pos < v->size && pos >= 0);
-	return v->data[pos];
-}
-
-/*	Put an item into the dynamic array at the specified location,
-	overwriting the element that was there
-	param: 	v		pointer to the dynamic array
-	param:	pos		the index to put the value into
-	param:	val		the value to insert 
-	pre:	v is not null
-	pre:	v is not empty
-	pre:	pos >= 0 and pos < size of the array
-	post:	index pos contains new value, val
-*/
-void putDynArr(DynArr *v, int pos, TYPE val)
-{
-	assert(v->data[pos]);
-	if (v->data[pos] != 0)
-	{
-		v->data[pos] = val;
-	}
-}
-
-/*	Swap two specified elements in the dynamic array
-	param: 	v		pointer to the dynamic array
-	param:	i,j		the elements to be swapped
-	pre:	v is not null
-	pre:	v is not empty
-	pre:	i, j >= 0 and i,j < size of the dynamic array
-	post:	index i now holds the value at j and index j now holds the value at i
-*/
-void swapDynArr(DynArr *v, int i, int  j)
-{
-	/* FIXME: You will write this function */
-	assert(v->data[i]);
-	assert(v->data[j]);
-	if (((v->data[i] != 0) || (v->data[j] != 0)) 
-		&& (i<v->size && j<v->size))
-	{
-		TYPE TempVal;
-		TempVal = v->data[i];
-		v->data[i] = v->data[j];
-		v->data[j] = TempVal;
-	}
-}
-
-/*	Remove the element at the specified location from the array,
-	shifts other elements back one to fill the gap
-	param: 	v		pointer to the dynamic array
-	param:	idx		location of element to remove
-	pre:	v is not null
-	pre:	v is not empty
-	pre:	idx < size and idx >= 0
-	post:	the element at idx is removed
-	post:	the elements past idx are moved back one
-*/
-void removeAtDynArr(DynArr *v, int idx)
-{
-	// for compilers that are not using -C99
-	int i;
-
-	assert(v->data[idx]);
-	if (idx < v->size)
-	{
-		for (i = idx; i < v->size; i++)
+		// Walk the link list
+		while ((Current->next != lst->lastLink) && (Current != l))
 		{
-			v->data[i] = v->data[i + 1];
+			Current = Current->next;
 		}
-		v->data[v->size] = 0;
-		v->size--;
+
+		if (Current == lst->lastLink)
+		{
+			// Unable to find the given link in the List to be inserted in front of it so adding to back.
+			addBackList(lst, v);
+		}
+		else
+		{
+			// Insert DLink at Point in List.
+			NewLink->prev = Current->prev;
+			NewLink->next = Current->next;
+
+			// Adjust the links prev & next in the list.
+			Current->prev->next = NewLink;
+			Current->next->prev = NewLink;
+
+			// Update the List Size Count
+			lst->size++;
+		}
+	}
+
+}
+
+/*
+	addFrontList
+	param: lst the linkedList
+	param: e the element to be added
+	pre: lst is not null
+	post: lst is not empty, increased size by 1
+*/
+
+void addFrontList(struct linkedList *lst, TYPE e)
+{
+	assert(lst != NULL);
+
+	struct DLink *NewLink = malloc(sizeof(struct DLink));
+
+	// Populate new Link
+	NewLink->value = e;
+	NewLink->next = lst->firstLink;
+	NewLink->prev = NULL;
+
+	// Add to the existing list and increment size
+	lst->firstLink->prev = NewLink;
+	lst->firstLink = NewLink;
+	lst->size++;
+}
+
+/*
+	addBackList
+	param: lst the linkedList
+	param: e the element to be added
+	pre: lst is not null
+	post: lst is not empty, increased size by 1
+*/
+
+// Additional Reference: https://gist.github.com/mycodeschool/7429492
+void addBackList(struct linkedList *lst, TYPE e) {
+	assert(lst != NULL);
+	struct DLink *NewLink = malloc(sizeof(struct DLink));
+
+	// Populate new Link
+	NewLink->value = e;
+	NewLink->next = NULL;
+	NewLink->prev = NULL;
+
+	// Add to the existing list and increment size
+	if (lst->firstLink == NULL)
+	{
+		lst->firstLink = NewLink;
+		return;
+	}
+	else
+	{
+		// Size greater than zero, list established.
+		struct DLink *Current = lst->firstLink;
+		while(Current->next != NULL) Current = Current->next;
+		Current->next = NewLink;
+		NewLink->prev = Current;
+		lst->lastLink = NewLink;
+		lst->size++;
+
+		return;
 	}
 }
 
-/* ************************************************************************
-	Stack Interface Functions
-************************************************************************ */
-
-/*	Returns boolean (encoded in an int) demonstrating whether or not the 
-	dynamic array stack has an item on it.
-	param:	v		pointer to the dynamic array
-	pre:	the dynArr is not null
-	post:	none
-	ret:	1 if empty, otherwise 0
+/*
+	frontList
+	param: lst the linkedList
+	pre: lst is not null
+	pre: lst is not empty
+	post: none
 */
-int isEmptyDynArr(DynArr *v)
-{
-	return (v->size == 0) ? 1 : 0;
+
+TYPE frontList (struct linkedList *lst) {
+	assert(lst != NULL);
+	assert(lst->size > 0);
+	/*temporary return value...you may need to change this */
+	return lst->firstLink->value;
 }
 
-/* 	Push an element onto the top of the stack
-	param:	v		pointer to the dynamic array
-	param:	val		the value to push onto the stack
-	pre:	v is not null
-	post:	size increases by 1
-			if reached capacity, capacity is doubled
-			val is on the top of the stack
+/*
+	backList
+	param: lst the linkedList
+	pre: lst is not null
+	pre: lst is not empty
+	post: lst is not empty
 */
-void pushDynArr(DynArr *v, TYPE val)
+
+TYPE backList(struct linkedList *lst)
 {
-	assert(v != 0);
-	addDynArr(v, val);
-	//if (v->size == v->capacity)
-	//	_dynArrSetCapacity(v, 2 * v->capacity);
-	//for (int i = 0; i < v->size; i++)
-	//{
-	//	v->data[i + 1] = v->data[i];
-	//}
-	//v->data[v->size] = val;
-	//v->size++;
+	assert(lst != NULL);
+	assert(lst->size > 0);
+	/*temporary return value...you may need to change this */
+	return lst->lastLink->value;
 }
 
-/*	Returns the element at the top of the stack 
-	param:	v pointer to the dynamic array
-	pre:	v is not null
-	pre:	v is not empty
-	post:	no changes to the stack
+/*
+	_removeLink
+	param: lst the linkedList
+	param: l the linke to be removed
+	pre: lst is not null
+	pre: l is not null
+	post: lst size is reduced by 1
 */
-TYPE topDynArr(DynArr *v)
+
+void _removeLink(struct linkedList *lst, struct DLink *l)
 {
-	return v->data[v->size-1];
+	assert(lst != NULL);
+	assert(l != NULL);
+
+	if (containsList(lst, l->value) == 1)
+	{
+		struct DLink *dlinkTemp = lst->firstLink;
+
+		while (dlinkTemp != lst->lastLink)
+		{
+			if (dlinkTemp == l)
+			{
+				// Set the previous link's next element to the following element after dlinkTemp.
+				dlinkTemp->prev->next = dlinkTemp->next;
+
+				// Set the next link's previous element to the dlinkTemp previous.
+				dlinkTemp->next->prev = dlinkTemp->prev;
+
+				//Reduce the size of the Link List Count
+				lst->size--;
+
+				// Free the memory for the dlinkTemp
+				free(dlinkTemp);
+
+				return;
+			}
+			else
+			{
+				dlinkTemp = dlinkTemp->next;
+			}
+		}
+	}
+	return;
 }
 
-/* Removes the element on top of the stack 
-	param:	v pointer to the dynamic array
-	pre:	v is not null
-	pre:	v is not empty
-	post:	size is decremented by 1
-			the top has been removed
+/*
+	removeFrontList
+	param: lst the linkedList
+	pre:lst is not null
+	pre: lst is not empty
+	post: size is reduced by 1
 */
-void popDynArr(DynArr *v)
-{
-	removeAtDynArr(v, v->size-1);
+
+void removeFrontList(struct linkedList *lst) {
+	assert(lst != NULL);
+
+	//Redirect the firstLink pointer
+	lst->firstLink = lst->firstLink->next;
+	lst->firstLink->prev = NULL;
+
+	// Adjust the size of the Link List
+	lst->size--;
 }
 
-/* ************************************************************************
-	Bag Interface Functions
-************************************************************************ */
+/*
+	removeBackList
+	param: lst the linkedList
+	pre: lst is not null
+	pre:lst is not empty
+	post: size reduced by 1
+*/
+
+void removeBackList(struct linkedList *lst)
+{	
+	assert(lst != NULL);
+
+	//Redirect the firstLink pointer
+	lst->lastLink = lst->lastLink->prev;
+	lst->firstLink->next = NULL;
+
+	// Adjust the size of the Link List
+	lst->size--;	
+}
+
+/*
+	isEmptyList
+	param: lst the linkedList
+	pre: lst is not null
+	post: none
+*/
+
+int isEmptyList(struct linkedList *lst) {
+	assert(lst!=NULL);
+	return (lst->size == 0) ? 1 : 0;
+}
+
+// Function specifically for the display of the list at the end game.
+void DisplayList(struct linkedList* lst) {
+	assert(lst != NULL && lst->size >= 1);
+
+	struct DLink *Current = lst->firstLink;
+
+	do{
+		printf("%s\n", Current->value);
+		Current = Current->next;
+	}while (Current->next != NULL);
+
+}
+
+/* Function to print list
+ Pre: lst is not null
+ */
+void _printList(struct linkedList* lst)
+{
+	assert(lst != NULL);
+
+	struct DLink *Current = lst->firstLink;
+
+	printf("Here are the values inside of the Linked List: [");
+	do
+	{
+		printf("%s, ", Current->value);
+		Current = Current->next;
+	}while (Current->next != NULL);
+	printf(" Size: %i]\n", lst->size);
+}
+
+/* 
+	Add an item to the bag
+	param: 	lst		pointer to the bag
+	param: 	v		value to be added
+	pre:	lst is not null
+	post:	a link storing val is added to the bag
+ */
+void addList(struct linkedList *lst, TYPE v)
+{
+	assert(lst != NULL);
+	addBackList(lst, v);
+}
 
 /*	Returns boolean (encoded as an int) demonstrating whether or not
 	the specified value is in the collection
 	true = 1
 	false = 0
-	param:	v		pointer to the dynamic array
-	param:	val		the value to look for in the bag
-	pre:	v is not null
-	pre:	v is not empty
+	param:	lst		pointer to the bag
+	param:	e		the value to look for in the bag
+	pre:	lst is not null
+	pre:	lst is not empty
 	post:	no changes to the bag
 */
-int containsDynArr(DynArr *v, TYPE val)
-{
-	// for compilers that are not using -C99
-	int i;
+int containsList (struct linkedList *lst, TYPE e) {
+	assert(lst != NULL);
 
-	for (i = 0; i < v->size; i++)
+	if (lst->size != 0)
 	{
-		if (EQ(v->data[i],val))
+		struct DLink Current1 = *lst->firstLink;
+		struct DLink Current2 = *lst->lastLink;
+
+		while ((Current1.next != lst->lastLink) && (Current2.prev != lst->firstLink))
 		{
-			return 1;
+			if ((Current1.value == e) || (Current2.value == e))
+			{
+				return 1;
+			}
+			else if (Current1.next == Current2.next)
+			{
+				// Both are the same link so check one and then return.
+				return (Current1.value == e) ? 1 : 0;
+			}
+			else
+			{
+				Current1 = *Current1.next;
+				Current2 = *Current2.prev;
+			}
 		}
 	}
+
+	/*Replaced default if while loop completes and finds nothing return 0 */
 	return 0;
 }
 
 /*	Removes the first occurrence of the specified value from the collection
 	if it occurs
-	param:	v		pointer to the dynamic array
-	param:	val		the value to remove from the array
-	pre:	v is not null
-	pre:	v is not empty
-	post:	val has been removed
+	param:	lst		pointer to the bag
+	param:	e		the value to be removed from the bag
+	pre:	lst is not null
+	pre:	lst is not empty
+	post:	e has been removed
 	post:	size of the bag is reduced by 1
 */
-void removeDynArr(DynArr *v, TYPE val)
-{
-	// for compilers that are not using -C99
-	int i;
+void removeList (struct linkedList *lst, TYPE e) {
+	assert(lst != NULL);
+	assert(lst->size > 0);
+	int listSize = lst->size;
 
-	/*assert(containsDynArr(v, val) == 1);*/
-	assert(v->size > 0);
+	struct DLink *TempLink = malloc(sizeof(struct DLink));
 
-	if (containsDynArr(v, val) == 1)
-	{
-		for (i = 0; i < v->size; i++)
-		{
-			if (EQ(v->data[i], val))
-			{
-				removeAtDynArr(v, i);
-			}
-		}
-	}
+	TempLink->value = e;
+
+	_removeLink(lst, TempLink);
+
+	assert(containsList(lst, e) == 0);
+	assert(listSize == (lst->size - 1));
 }

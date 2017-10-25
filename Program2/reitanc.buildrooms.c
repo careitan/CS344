@@ -306,7 +306,7 @@ void WriteOutput(int pid)
 				sprintf(buf, "ROOM TYPE: START_ROOM");
 			break;
 			case 3:
-				sprintf(buf, "ROOM TYPE: FINISH_ROOM");
+				sprintf(buf, "ROOM TYPE: END_ROOM");
 			break;
 		}
 		n_written = write(FileID, buf, FindStringLength(buf));
