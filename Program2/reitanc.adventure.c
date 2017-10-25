@@ -77,12 +77,13 @@ int main(int argc, char* argv[])
 	char RoomSuffix[] = "_room"; 	// Used to quickly append to the CurrentRoomFile to get the file name.
 
 	// Going to use for holding the two threads we use for this program.
-	// Element 0 will be the main program thread that is running.
+	// Element 0 will be the program thread that is going to write to Pathfile.
 	// Element 1 will be the timer when it is called.
 	/*
 	int pthreadResult;
 	pthread_t Threads[2];
-	pthread_t MainThreadID, TimerThreadID;	
+	pthread_t MainThreadID, TimerThreadID;
+	char 
 
 	MainThreadID = pthread_self();
 	Threads[0] = MainThreadID;
@@ -91,9 +92,8 @@ int main(int argc, char* argv[])
 	if (pthreadResult == 0) Threads[1]=TimerThreadID;
 
 	pthread_mutex_t GameMutex = PTHREAD_MUTEX_INITIALIZER;
-	*/
 	// End setup of the Thread function and operations.
-
+*/
 	// DEBUG Operational Testing
 
 	// Initialization of variables that require a non-null starting point.
@@ -111,9 +111,14 @@ int main(int argc, char* argv[])
 	Steps_Taken=0;
 	do
 	{
+		// Arrival in room.
 		RenderRoom(CurrentRoomFile);
+
+		// Get user input for room move
 		memset(Buf,'\0', sizeof(Buf));
 		scanf("%s", Buf);
+
+		// Process user input into a string array for passing around in functions if needed.
 		memset(EvalString,'\0', sizeof(EvalString));
 		sprintf(EvalString, Buf);
 
@@ -123,19 +128,19 @@ int main(int argc, char* argv[])
 			MakeTime();
 		}else if (IsValidConnection(CurrentRoomFile, EvalString))
 		{
-			// TODO: If Valid Move push onto Path.
-			// TODO: Check if room moving to is going to be end room.
+			// Room is valid for moving and set the next step.
 			memset(CurrentRoomFile, '\0', sizeof(CurrentRoomFile));
 			sprintf(CurrentRoomFile,"%s", EvalString);
 
-			// Add room to the PATH and update count.
+			// Add room to the PATH and update step count.
 			WritePath(CurrentRoomFile, TempFile);
 			Steps_Taken++;
 
-			// Check for GAME OVER.
+			// Check for GAME OVER, and set flag for while loop.
 			GameOver = IsGameOver(CurrentRoomFile);
 		}else
 		{
+			// User inputed something that didn't match.
 			printf("\nHAL 9000 SAYS, \'I'M SORRY I AM AFRAID I JUST CAN\'T DO THAT.\'  TRY AGAIN.\n");
 		}
 	} while (GameOver == false);
@@ -576,7 +581,7 @@ int MakeTime()
 
   if (FileID != -1)
   {
-  	write(FileID, asctime(timeinfo), strlen(asctime(timeinfo)));
+  	write(FileID, LongDateString, strlen(LongDateString));
   	close(FileID);
   }else{
   	printf("ERROR: Unable to open the file currentTime.txt for writing.");
