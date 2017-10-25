@@ -29,8 +29,8 @@ char *TempBuf;		// A Temporary string to be passed between the three helper func
 #define DYNAMIC_ARRAY_INCLUDED 1
 
 # ifndef TYPE
-# define TYPE     double 
-# define TYPE_SIZE sizeof(double)
+# define TYPE     char *
+# define TYPE_SIZE sizeof(char)
 # endif
 
 # ifndef EQ
@@ -45,7 +45,7 @@ struct DynArr
 	int capacity;	/* capacity ofthe array */
 };
 
-/* Dynamic Array Functions */
+
 DynArr *createDynArr(int cap);
 void deleteDynArr(DynArr *v);
 
@@ -89,6 +89,7 @@ bool ValidConnection(char RoomFile[], int ConnNumber);
 void RenderRoom(char RoomFile[]);
 bool IsGameOver(char RoomFile[]);
 int MakeTime();
+void RenderGameOver(DynArr *v, int Steps);
 
 // Tool or Assistance Functions
 void stripLeadingAndTrailingSpaces(char* string);
@@ -105,19 +106,35 @@ int main(int argc, char* argv[])
 	*******/
 	DynArr *Path;
 	Path = createDynArr(2);
-	int Steps_Taken = 0;
+	int Steps_Taken = 0; 		// Should always be one step less than the number of elements in path.
 	char CurrentRoomFile[128];
 	int CurrentRoom;
-	bool IsGameOver = false;
+	bool GameOver = false;
 	bool IsValidMove = false;
-	char Buf[MAX_READ];
+	char Buf[MAX_READ];			// Dynamic array for holding characters as needed for processing.
+	char TestString[MAX_READ];  // Dynamic array for holding characters as needed for processing.
 	char RoomSuffix[] = "_room";
 
-	// DEBUG Operational Testing
-	//DIR* dirToCheck; // Holds the directory we're starting in
-	//struct dirent *fileInDir; // Holds the current subdir of the starting dir
+	// Going to use for holding the two threads we use for this program.
+	// Element 0 will be the main program thread that is running.
+	// Element 1 will be the timer when it is called.
+	/*
+	int pthreadResult;
+	pthread_t Threads[2];
+	pthread_t MainThreadID, TimerThreadID;	
 
-	
+	MainThreadID = pthread_self();
+	Threads[0] = MainThreadID;
+
+	pthreadResult = pthread_create(&TimerThreadID, NULL, MakeTime, NULL);
+	if (pthreadResult == 0) Threads[1]=TimerThreadID;
+
+	pthread_mutex_t GameMutex = PTHREAD_MUTEX_INITIALIZER;
+	*/
+	// End setup of the Thread function and operations.
+
+	// DEBUG Operational Testing
+
 	// Initialization of variables that require a non-null starting point.
 	memset(RoomDir, '\0', sizeof(RoomDir));
 	memset(CurrentRoomFile, '\0', sizeof(CurrentRoomFile));
@@ -126,10 +143,43 @@ int main(int argc, char* argv[])
 	FindRoomsDir(RoomDir);
 	sprintf(CurrentRoomFile, FindStartRoom(RoomDir));
 
+	// Put Start Room on the PATH Stack.
+	pushDynArr(Path, CurrentRoomFile);
 
-	MakeTime();
+	// Starting the game up
+	do
+	{
+		RenderRoom(CurrentRoomFile);
+		// TODO: SCANF Processing of typed input.
+		memset(Buf,'\0', sizeof(Buf));
+		scanf("%s", Buf);
+		memset(TestString,'\0', sizeof(TestString));
+		sprintf(TestString, Buf);
 
-	RenderRoom(CurrentRoomFile);
+		if (strcmp(Buf,"time")==0)
+		{
+			// TODO: Process time input and mutex.
+			MakeTime();
+		}else if (IsValidConnection(CurrentRoomFile, TestString))
+		{
+			// TODO: If Valid Move push onto Path.
+			// TODO: Check if room moving to is going to be end room.
+			memset(CurrentRoomFile, '\0', sizeof(CurrentRoomFile));
+			sprintf(CurrentRoomFile,"%s", TestString);
+
+			// Add room to the PATH and update count.
+			pushDynArr(Path, CurrentRoomFile);
+			Steps_Taken++;
+
+			// Check for GAME OVER.
+			GameOver = IsGameOver(CurrentRoomFile);
+		}else
+		{
+			printf("HAL 9000 SAYS, \'I'M SORRY I AM AFRAID I JUST CAN\'T DO THAT.\'  TRY AGAIN.\n");
+		}
+	} while (GameOver = false);
+
+	//pthread_mutex_destroy(&GameMutex);
 
 	return 0;
 };
@@ -162,7 +212,6 @@ void stripLeadingAndTrailingSpaces(char* string)
      }
      *endOfString = '\0';
 }
-
 
 // FindRoomsFiles - Find the most current directory based on File Mod property and populate the char array.
 void FindRoomsDir(char s[])
@@ -466,12 +515,31 @@ void RenderRoom(char RoomFile[])
 	printf(".\n");
 
 	// Final Line on the Room Display.
-	printf("WHERE TO? >\n");
+	printf("WHERE TO? >");
 }
 
+// Just check and see if the room moving into is an END_ROOM
 bool IsGameOver(char RoomFile[])
 {
 	return (GetRoomType(RoomFile)=="END_ROOM") ? true : false;
+}
+
+//
+void RenderGameOver(DynArr *v, int Steps)
+{
+	assert(v);
+	assert(Steps);
+	int i;
+
+	printf("\nYOU HAVE FOUND THE END ROOM. CONGRATULATIONS!\n");
+	printf("YOU TOOK %d STEP%s.  YOUR PATH TO VICTORY WAS:\n", Steps, (Steps > 1) ? "S" : "");
+
+	for (i = 0; i < Steps+1; ++i)
+	{
+		printf("%s\n", getDynArr(v, i));
+	}
+
+	return;
 }
 
 // The timer function that is used with the MUTEX implementation to demonstrate a second thread.
@@ -497,10 +565,14 @@ int MakeTime()
   time (&rawtime);
   timeinfo = localtime (&rawtime);
 
+/*
   sprintf(LongDateString, " %.2d:%.2d%s , %s, %s %3d, %d\n",
   	((timeinfo->tm_hour-11)>0)?timeinfo->tm_hour-12 : timeinfo->tm_hour, timeinfo->tm_min, ((timeinfo->tm_hour-11)>0)?"pm":"am",
   	weekday[timeinfo->tm_wday], month_name[timeinfo->tm_mon], timeinfo->tm_mday, 
   	1900+timeinfo->tm_year);
+  */
+  strftime(LongDateString, 100, " %I:%M%p , %A, %B %d, %Y", timeinfo);
+
   printf("\n%s\n", LongDateString);
 
   FileID = open("currentTime.txt", O_WRONLY | O_CREAT, 0766);
