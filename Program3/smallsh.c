@@ -23,14 +23,42 @@ typedef int bool;
 #define true  1
 #define false 0
 
-
-
+char[] ParseCommandLine(char[] string);
+void SpawnFork(pid_t ProcessID);
+void SpawnExec(pid_t ProcessID);
+void SpawnWaitPid(pid_t ProcessID);
 
 
 void main()
 {
 
 
+
+}
+
+// function to parse out or crack the commandline
+char[] ParseCommandLine(char[] string)
+{
+	char[] ReturnVal;
+
+	return ReturnVal;
+}
+
+// function to spawn a seperate thread via a fork.
+void SpawnFork(pid_t ProcessID)
+{
+
+}
+
+// function to spawn a seperate thread via a fork.
+void SpawnExec(pid_t ProcessID)
+{
+
+}
+
+// function to spawn a seperate thread via waitpid.
+void SpawnWaitPid(pid_t ProcessID)
+{
 
 }
 
