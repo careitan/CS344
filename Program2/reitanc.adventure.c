@@ -34,6 +34,12 @@ char PathStr[MAX_READBACK]; // The temporary string that will read in all of the
 pthread_mutex_t GameMutex; // The Mutex that will be used as the Locking plane.
 char TempFile[] = "Pathfile"; // The path output file.
 
+// Struct for passing in two arguments into a process thread for Make Time.
+struct ThreadArg{
+	void *my_mutex;
+	bool Display;
+};
+
 // Functions used to implement CS 344 - Program 2 assignment requirements
 void FindRoomsDir(char s[]);
 char* FindStartRoom(char s[]);
@@ -49,7 +55,7 @@ int RenderRoom(char RoomFile[]);
 bool IsGameOver(char RoomFile[]);
 int CreatePath(char RoomFile[], char FileName[]);
 int WritePath(char RoomFile[], char FileName[]);
-int MakeTime(void *my_mutex);
+int MakeTime(void *my_mutex, bool Display);
 void RenderGameOver(int Steps, char Path[]);
 
 // Tool or Assistance Functions
@@ -71,6 +77,7 @@ int main(void)
 	int Steps_Taken = 0;
 	char CurrentRoomFile[128];
 	char RoomSuffix[] = "_room"; 	// Used to quickly append to the CurrentRoomFile to get the file name.
+	struct ThreadArg ProcArgs;
 
 	// Going to use for holding the two threads we use for this program.
 	// Element 0 will be the program thread that is going to write to Pathfile.
@@ -98,7 +105,9 @@ int main(void)
 	CreatePath(CurrentRoomFile, TempFile);
 
 	pthread_mutex_lock(&GameMutex);
-	pthreadResult = pthread_create(&Threads[1], NULL, (void*)&MakeTime, &GameMutex);
+	ProcArgs.my_mutex = &GameMutex;
+	ProcArgs.Display = false;
+	pthreadResult = pthread_create(&Threads[1], NULL, (void*)&MakeTime, &ProcArgs);
 	assert(0 == pthreadResult);
 	// End setup of the Thread function and operations.
 
@@ -510,7 +519,10 @@ int RenderRoom(char RoomFile[])
 			if (strcmp(Buf,"time")==0)
 			{
 				pthread_mutex_unlock(&GameMutex);
-				MakeTime(&GameMutex);
+
+				// Launch other process
+				MakeTime(&GameMutex, true);
+
 				pthread_mutex_lock(&GameMutex);
 			}else if (IsValidConnection(CurrentRoomFile, EvalString))
 			{
@@ -611,33 +623,34 @@ void RenderGameOver(int Steps, char Path[])
 // 2. Print it out on the screen.
 // 3. Write it out to a local file called 'currentTime.txt'
 // REF: http://www.cplusplus.com/reference/ctime/localtime/
-int MakeTime(void *my_mutex)
+int MakeTime(void *my_mutex, bool Display)
 {
   time_t rawtime;
   struct tm * timeinfo;
   char LongDateString[100] = "";
   int FileID;
 
-  time (&rawtime);
-  timeinfo = localtime (&rawtime);
-  strftime(LongDateString, 100, " %I:%M%p, %A, %B %d, %Y", timeinfo);
+	if (Display)
+	{
+	  time (&rawtime);
+	  timeinfo = localtime (&rawtime);
+	  strftime(LongDateString, 100, " %I:%M%p, %A, %B %d, %Y", timeinfo);
 
-  printf("\n%s\n", LongDateString);
+	  printf("\n%s\n", LongDateString);
 
-  pthread_mutex_lock(my_mutex);
+	  pthread_mutex_lock(my_mutex);
+	  FileID = open("currentTime.txt", O_WRONLY | O_CREAT, 0766);
 
-  FileID = open("currentTime.txt", O_WRONLY | O_CREAT, 0766);
-
-  if (FileID != -1)
-  {
-  	write(FileID, LongDateString, strlen(LongDateString));
-  	close(FileID);
-  }else{
-  	printf("ERROR: Unable to open the file currentTime.txt for writing.");
-  	return 1;
-  }
-
-  pthread_mutex_unlock(my_mutex);
+	  if (FileID != -1)
+	  {
+	  	write(FileID, LongDateString, strlen(LongDateString));
+	  	close(FileID);
+	  }else{
+	  	printf("ERROR: Unable to open the file currentTime.txt for writing.");
+	  	return 1;
+	  }
+	  pthread_mutex_unlock(my_mutex);
+	}
 
   return 0;
 }
