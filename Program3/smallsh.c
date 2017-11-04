@@ -38,11 +38,11 @@ void SpawnFork(pid_t ProcessID);
 void SpawnExec(pid_t ProcessID);
 void SpawnWaitPid(pid_t ProcessID);
 
-void main()
+int main()
 {
 
 
-	return;
+	return 0;
 };
 
 // Function implementations for the built-in functions.
