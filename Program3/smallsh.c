@@ -23,23 +23,48 @@ typedef int bool;
 #define true  1
 #define false 0
 
-char[] ParseCommandLine(char[] string);
+// Program defined requirements
+#define MAXLINE_LENGTH 	2048;
+#define MAXARGS			512;
+
+// Program required Built-In Functions
+void ProcessExit();
+int ProcessCd();
+int ProcessStatus();
+
+// Utility Functions for executing the program
+bool ParseCommandLine(char* string);
 void SpawnFork(pid_t ProcessID);
 void SpawnExec(pid_t ProcessID);
 void SpawnWaitPid(pid_t ProcessID);
-
 
 void main()
 {
 
 
+	return;
+};
+
+// Function implementations for the built-in functions.
+void ProcessExit()
+{
 
 }
-
-// function to parse out or crack the commandline
-char[] ParseCommandLine(char[] string)
+int ProcessCd()
 {
-	char[] ReturnVal;
+
+	return 0;
+}
+int ProcessStatus()
+{
+
+	return 0;
+}
+
+// function to parse out the commandline for validity
+bool ParseCommandLine(char* string)
+{
+	bool ReturnVal=false;
 
 	return ReturnVal;
 }
