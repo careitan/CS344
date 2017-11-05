@@ -9,12 +9,13 @@
 ********************************/
 #include <assert.h>
 #include <dirent.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <fcntl.h>
-#include <string.h>
 #include <math.h>
 #include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -48,17 +49,30 @@ int main(int argc, char* argv[])
 {
 	IsExit = false;
 	int ReturnVal=-1;
-	char commandLine[MAXLINE_LENGTH];
+	char commandLine[MAXLINE_LENGTH];  // read in the stdin put.
 
 	// DEBUG
-	printf("Process Thread for smallsh: %i\n", getpid());
+	// printf("Process Thread for smallsh: %i\n", getpid());
 
 	// Main loop to process user input
 
 	while(IsExit==false){
+		printf("\n: ");
+		memset(commandLine,'\0',MAXLINE_LENGTH);
 		ReturnVal = getlineClean(commandLine, MAXLINE_LENGTH);
 
-		if (ReturnVal > 0) printf("%s\n", commandLine);
+		if (ReturnVal > 0){
+			// Got something passed into the shell program via stdin.
+			// Check for validity before processing it.
+			if (ParseValidCommandLine(commandLine))
+			{
+				printf("%s", commandLine);
+			}
+			// Handle the line if something odd appeared.
+			else{
+				// printf("INVALID: %s", commandLine);
+			}
+		}
 
 		if (strcmp(commandLine,"exit") == 0) ProcessEXIT();
 	};
@@ -71,6 +85,7 @@ int main(int argc, char* argv[])
 // Reads a line and returns length.
 int getlineClean(char *line, int max)
 {
+	// TODO: Implement a feature to prompt the user for input if STDIN is already empty.
 	if (fgets(line, max, stdin)==NULL)
 		return 0;
 	else{
@@ -85,7 +100,7 @@ void ProcessEXIT()
 	// TODO: Shut down all of the background child processes.
 	
 	IsExit = true;
-	printf("Value of IsExit is: %i\n", IsExit);
+	printf("\nValue of IsExit is: %i\n", IsExit);
 }
 int ProcessCD()
 {
@@ -102,15 +117,11 @@ bool ParseValidCommandLine(char* string)
 {
 	bool ReturnVal=true;
 	int Length = strlen(string);
-	char *subbuf = (char*) malloc(5);
 
-	if (strlen(string)>MAXLINE_LENGTH) ReturnVal = false;	// Exceeded Maximum Line Length.
-	if (strcmp(string,"(")==0 || strcmp(string,")")==0) ReturnVal = false;	// Contains the use of Parens like a Subshell.
-
-	strncpy(subbuf, string+(Length-1), 2);  // parse off the last two charcahers int he string to check.
-	if (Length >=2 && 
-		strcmp(string," &")==0 && 
-		strcmp(subbuf, "&") != 0) ReturnVal = false; // Use of the '&' somewhere other than in the trailing position of function.										
+	if (Length > MAXLINE_LENGTH) ReturnVal = false;	// Exceeded Maximum Line Length.
+	if (strcspn(string,"(") < Length || strcspn(string,")") < Length) ReturnVal = false;	// Contains the use of Parens like a Subshell.
+	if (strcspn(string,"&") < Length-1 && strcmp(string,"&")==0) ReturnVal = false; // Use of the '&' somewhere other than in the trailing position of function.										
+	if (strcspn(string,"#")==0) ReturnVal = false;	// Comment String nothing to see here move along.
 
 	return ReturnVal;
 }
