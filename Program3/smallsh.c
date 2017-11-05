@@ -24,47 +24,93 @@ typedef int bool;
 #define false 0
 
 // Program defined requirements
-#define MAXLINE_LENGTH 	2048;
-#define MAXARGS			512;
+#define MAXLINE_LENGTH 	2048
+#define MAXARGS			512
 
 // Program required Built-In Functions
-void ProcessExit();
-int ProcessCd();
-int ProcessStatus();
+void ProcessEXIT();
+int ProcessCD();
+void ProcessSTATUS();
 
 // Utility Functions for executing the program
-bool ParseCommandLine(char* string);
+bool ParseValidCommandLine(char* string);
 void SpawnFork(pid_t ProcessID);
 void SpawnExec(pid_t ProcessID);
 void SpawnWaitPid(pid_t ProcessID);
+int getlineClean(char *line, int max);
 
-int main()
+// Supporting Globals to Handle Key resources throughout program.
+char* CurrentStatus;
+bool IsExit;
+struct pthread_t *ShellBgProcs;			// Array to hold the Process Threads running.
+
+int main(int argc, char* argv[])
 {
+	IsExit = false;
+	int ReturnVal=-1;
+	char commandLine[MAXLINE_LENGTH];
 
+	// DEBUG
+	printf("Process Thread for smallsh: %i\n", getpid());
 
+	// Main loop to process user input
+
+	while(IsExit==false){
+		ReturnVal = getlineClean(commandLine, MAXLINE_LENGTH);
+
+		if (ReturnVal > 0) printf("%s\n", commandLine);
+
+		if (strcmp(commandLine,"exit") == 0) ProcessEXIT();
+	};
+
+	printf("\nHello World! Away we go...\n");
 	return 0;
 };
 
+// K&R C Programming Language, 2nd Ed.  Page 165; Refactored for this program.
+// Reads a line and returns length.
+int getlineClean(char *line, int max)
+{
+	if (fgets(line, max, stdin)==NULL)
+		return 0;
+	else{
+		line[strcspn(line,"\n")]='\0';
+		return strlen(line);
+	}
+}
+
 // Function implementations for the built-in functions.
-void ProcessExit()
+void ProcessEXIT()
 {
-
+	// TODO: Shut down all of the background child processes.
+	
+	IsExit = true;
+	printf("Value of IsExit is: %i\n", IsExit);
 }
-int ProcessCd()
+int ProcessCD()
 {
 
 	return 0;
 }
-int ProcessStatus()
+void ProcessSTATUS()
 {
-
-	return 0;
+	printf("%s\n", CurrentStatus);
 }
 
-// function to parse out the commandline for validity
-bool ParseCommandLine(char* string)
+// function to parse out the commandLine for validity
+bool ParseValidCommandLine(char* string)
 {
-	bool ReturnVal=false;
+	bool ReturnVal=true;
+	int Length = strlen(string);
+	char *subbuf = (char*) malloc(5);
+
+	if (strlen(string)>MAXLINE_LENGTH) ReturnVal = false;	// Exceeded Maximum Line Length.
+	if (strcmp(string,"(")==0 || strcmp(string,")")==0) ReturnVal = false;	// Contains the use of Parens like a Subshell.
+
+	strncpy(subbuf, string+(Length-1), 2);  // parse off the last two charcahers int he string to check.
+	if (Length >=2 && 
+		strcmp(string," &")==0 && 
+		strcmp(subbuf, "&") != 0) ReturnVal = false; // Use of the '&' somewhere other than in the trailing position of function.										
 
 	return ReturnVal;
 }
