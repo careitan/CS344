@@ -29,27 +29,36 @@ typedef int bool;
 #define MAXARGS			512
 
 // Program required Built-In Functions
-void ProcessEXIT();
+void ProcessEXIT(int ShellProcs[]);
 int ProcessCD();
 void ProcessSTATUS();
 
 // Utility Functions for executing the program
-bool ParseValidCommandLine(char* string);
+bool IsValidCommandLine(char* string);
+void ParseCommandline(char* arguments[], char* string);
 void SpawnFork(pid_t ProcessID);
 void SpawnExec(pid_t ProcessID);
 void SpawnWaitPid(pid_t ProcessID);
 int getlineClean(char *line, int max);
+// void AddProcessToStack(struct pthread_t* v[], struct pthread_t newProc);
+void stripLeadingAndTrailingSpaces(char* string);
 
 // Supporting Globals to Handle Key resources throughout program.
-char* CurrentStatus;
+char* CurrentStatus;			// Holding string for the message of the current status to feed to GetStatus process.
 bool IsExit;
-struct pthread_t *ShellBgProcs;			// Array to hold the Process Threads running.
+int MainPID;					// Holding variable for the Main Process ID to be passed to child process as needed to support program requirements.
 
 int main(int argc, char* argv[])
 {
 	IsExit = false;
 	int ReturnVal=-1;
 	char commandLine[MAXLINE_LENGTH];  // read in the stdin put.
+	char* ARGS;
+	int ShellBgProcs[1];		// Array to hold the Process Threads running.
+
+	// TODO: Are we going to need a MUTEX here to handle process and thread locks.
+	MainPID = getpid();
+	ShellBgProcs[0] = 0;  	// initialize the memory space for the start of the program.
 
 	// DEBUG
 	// printf("Process Thread for smallsh: %i\n", getpid());
@@ -58,14 +67,21 @@ int main(int argc, char* argv[])
 
 	while(IsExit==false){
 		printf("\n: ");
-		memset(commandLine,'\0',MAXLINE_LENGTH);
+		memset(commandLine, '\0', MAXLINE_LENGTH);
 		ReturnVal = getlineClean(commandLine, MAXLINE_LENGTH);
 
 		if (ReturnVal > 0){
 			// Got something passed into the shell program via stdin.
 			// Check for validity before processing it.
-			if (ParseValidCommandLine(commandLine))
+			if (IsValidCommandLine(commandLine))
 			{
+				// Handle the commandLine that passed into the shell.
+				// Parse the commandLine into the necessary shell operations.
+				ParseCommandline(&ARGS, commandLine);
+
+
+
+
 				printf("%s", commandLine);
 			}
 			// Handle the line if something odd appeared.
@@ -74,7 +90,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		if (strcmp(commandLine,"exit") == 0) ProcessEXIT();
+		if (strcmp(commandLine,"exit") == 0) ProcessEXIT(ShellBgProcs);
 	};
 
 	printf("\nHello World! Away we go...\n");
@@ -95,9 +111,13 @@ int getlineClean(char *line, int max)
 }
 
 // Function implementations for the built-in functions.
-void ProcessEXIT()
+void ProcessEXIT(int ShellProcs[])
 {
 	// TODO: Shut down all of the background child processes.
+	for (int i = 0; i < sizeof(ShellProcs)/sizeof(int); ++i)
+	{
+		printf("%i", ShellProcs[i]);
+	}
 	
 	IsExit = true;
 	printf("\nValue of IsExit is: %i\n", IsExit);
@@ -113,7 +133,7 @@ void ProcessSTATUS()
 }
 
 // function to parse out the commandLine for validity
-bool ParseValidCommandLine(char* string)
+bool IsValidCommandLine(char* string)
 {
 	bool ReturnVal=true;
 	int Length = strlen(string);
@@ -126,21 +146,110 @@ bool ParseValidCommandLine(char* string)
 	return ReturnVal;
 }
 
+// create an Arguements array to pass into the Exec() Command.
+// split out the string into Arguements and then append the NULL to the last element in the array.
+// Based on String to Array parsing routine found online at: https://stackoverflow.com/questions/11198604/c-split-string-into-an-array-of-strings
+void ParseCommandline(char* arguments[], char* string)
+{
+	assert(string!=NULL);
+	int n_spaces=0;
+	char *p = strtok(string, " ");
+	char *TempString = '\0';
+
+	arguments = malloc(sizeof(char*) * strlen(string));
+
+	while(p != NULL)
+	{
+		if (arguments == NULL)
+			exit(-1);	/* memory allocation failed */
+
+		if ((n_spaces) >= 1) // check to see if we are in the second arguement and look for ECHO on Arg[0]
+		{
+			if (strcmp(arguments[0],"echo")==0)
+			{
+				scanf(TempString, "%s%s%s", arguments[n_spaces], " ", p); 
+
+				arguments[n_spaces]=TempString;
+			}
+			else
+			{
+				scanf(arguments[n_spaces], "%s", p);
+			}
+		}
+		else
+		{
+			arguments[n_spaces] = p;
+		}
+
+		p = strtok(NULL, " ");
+		n_spaces++;
+	}
+
+	/* realloc one extra element for the last NULL */
+	arguments = realloc(arguments, (sizeof(char*) * strlen(string)) +1);
+	arguments[n_spaces] = 0;
+
+	// DEBUG
+	for (int i = 0; i < n_spaces; ++i) printf("%s",arguments[i]);	
+
+	return;
+}
+
 // function to spawn a seperate thread via a fork.
 void SpawnFork(pid_t ProcessID)
 {
 
 }
 
-// function to spawn a seperate thread via a fork.
+// function to spawn the Exec function.
 void SpawnExec(pid_t ProcessID)
 {
 
 }
 
-// function to spawn a seperate thread via waitpid.
+// function to hold for a thread via waitpid.
 void SpawnWaitPid(pid_t ProcessID)
 {
 
 }
 
+/*
+void AddProcessToStack(struct pthread_t* v[], struct pthread_t newProc)
+{
+	assert(v!=NULL);
+
+	for (int i = 0; i < sizeof(v)/sizeof(struct pthread_t); ++i)
+	{
+		if (v[i]!=NULL)
+		{
+			
+		}
+	}
+}
+*/
+
+// https://stackoverflow.com/questions/352055/best-algorithm-to-strip-leading-and-trailing-spaces-in-c
+void stripLeadingAndTrailingSpaces(char* string)
+{
+     assert(string);
+
+     /* First remove leading spaces */
+     const char* firstNonSpace = string;
+
+     while(*firstNonSpace != '\0' && isspace(*firstNonSpace))
+     {
+          ++firstNonSpace;
+     }
+
+     size_t len = strlen(firstNonSpace)+1;         
+     memmove(string, firstNonSpace, len);
+
+     /* Now remove trailing spaces */
+     char* endOfString = string + len;
+
+     while(string < endOfString  && isspace(*endOfString))
+     {
+          --endOfString ;
+     }
+     *endOfString = '\0';
+}
