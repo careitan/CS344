@@ -8,6 +8,7 @@
 *
 ********************************/
 #include <assert.h>
+#include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <math.h>
@@ -16,8 +17,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 typedef int bool;
@@ -36,8 +38,9 @@ void ProcessSTATUS();
 // Utility Functions for executing the program
 bool IsValidCommandLine(char* string);
 void ParseCommandline(char* arguments[], char* string);
-void SpawnFork(pid_t ProcessID);
-void SpawnExec(pid_t ProcessID);
+void SpawnFork(char* arguments[]);
+void SpawnForkAndExec(char* arguments[]);
+void SpawnExec(char* arguments[]);
 void SpawnWaitPid(pid_t ProcessID);
 int getlineClean(char *line, int max);
 // void AddProcessToStack(struct pthread_t* v[], struct pthread_t newProc);
@@ -53,8 +56,10 @@ int main(int argc, char* argv[])
 	IsExit = false;
 	int ReturnVal=-1;
 	char commandLine[MAXLINE_LENGTH];  // read in the stdin put.
-	char* ARGS;
-	int ShellBgProcs[1];		// Array to hold the Process Threads running.
+	char* ARGS[516];
+	int ShellBgProcs[256];		// Array to hold the Process Threads running.
+	pid_t ChildPid = -5;
+	int childExitStatus = -5;
 
 	// TODO: Are we going to need a MUTEX here to handle process and thread locks.
 	MainPID = getpid();
@@ -66,7 +71,6 @@ int main(int argc, char* argv[])
 	// Main loop to process user input
 
 	while(IsExit==false){
-		printf("\n: ");
 		memset(commandLine, '\0', MAXLINE_LENGTH);
 		ReturnVal = getlineClean(commandLine, MAXLINE_LENGTH);
 
@@ -77,12 +81,33 @@ int main(int argc, char* argv[])
 			{
 				// Handle the commandLine that passed into the shell.
 				// Parse the commandLine into the necessary shell operations.
-				ParseCommandline(&ARGS, commandLine);
+				ParseCommandline(ARGS, commandLine);
+
+				// Parse the ARGS to check and see if we have one of the three that we are supposed to handle internaly.
 
 
 
 
-				printf("%s", commandLine);
+				// Fork the new process to run and perform the necesary operation.
+				switch(ChildPid = fork()){
+					case -1:
+						CurrentStatus = '\0';
+						sprintf(CurrentStatus, "%s %i", "Fork Errored", -1);
+						break;
+
+					case 0:
+						// Success start Exec
+						SpawnExec(ARGS);
+						break;
+
+					default:
+						// Possibly add the WaitPID() function here.
+						fflush(stdout);
+						waitpid(ChildPid, &childExitStatus, 0);
+
+						break;
+				}
+
 			}
 			// Handle the line if something odd appeared.
 			else{
@@ -93,7 +118,9 @@ int main(int argc, char* argv[])
 		if (strcmp(commandLine,"exit") == 0) ProcessEXIT(ShellBgProcs);
 	};
 
-	printf("\nHello World! Away we go...\n");
+	// DEBUG
+	// printf("\nHello World! Away we go...\n");
+
 	return 0;
 };
 
@@ -102,6 +129,8 @@ int main(int argc, char* argv[])
 int getlineClean(char *line, int max)
 {
 	// TODO: Implement a feature to prompt the user for input if STDIN is already empty.
+	printf("\n: ");
+
 	if (fgets(line, max, stdin)==NULL)
 		return 0;
 	else{
@@ -114,16 +143,20 @@ int getlineClean(char *line, int max)
 void ProcessEXIT(int ShellProcs[])
 {
 	// TODO: Shut down all of the background child processes.
-	for (int i = 0; i < sizeof(ShellProcs)/sizeof(int); ++i)
+	for (int i = 0; i < sizeof(ShellProcs)/sizeof(int); i++)
 	{
-		printf("%i", ShellProcs[i]);
+		if (ShellProcs[i] > 0)
+		{
+			printf("%i ", ShellProcs[i]);
+		}
 	}
 	
 	IsExit = true;
-	printf("\nValue of IsExit is: %i\n", IsExit);
+	// printf("\nValue of IsExit is: %i\n", IsExit);
 }
 int ProcessCD()
 {
+
 
 	return 0;
 }
@@ -149,62 +182,72 @@ bool IsValidCommandLine(char* string)
 // create an Arguements array to pass into the Exec() Command.
 // split out the string into Arguements and then append the NULL to the last element in the array.
 // Based on String to Array parsing routine found online at: https://stackoverflow.com/questions/11198604/c-split-string-into-an-array-of-strings
-void ParseCommandline(char* arguments[], char* string)
+void ParseCommandline(char *arguments[], char* string)
 {
 	assert(string!=NULL);
 	int n_spaces=0;
 	char *p = strtok(string, " ");
-	char *TempString = '\0';
 
-	arguments = malloc(sizeof(char*) * strlen(string));
-
-	while(p != NULL)
+	// Process the tokens in the string.
+	do
 	{
-		if (arguments == NULL)
-			exit(-1);	/* memory allocation failed */
-
-		if ((n_spaces) >= 1) // check to see if we are in the second arguement and look for ECHO on Arg[0]
+		if (strcmp(p, "<") != 0 &&
+			strcmp(p, ">") != 0 &&
+			strcmp(p, "&") != 0)
 		{
-			if (strcmp(arguments[0],"echo")==0)
-			{
-				scanf(TempString, "%s%s%s", arguments[n_spaces], " ", p); 
-
-				arguments[n_spaces]=TempString;
-			}
-			else
-			{
-				scanf(arguments[n_spaces], "%s", p);
-			}
+			arguments[n_spaces] = p;
 		}
 		else
 		{
-			arguments[n_spaces] = p;
+			break;
 		}
 
 		p = strtok(NULL, " ");
 		n_spaces++;
-	}
+	}while(p != NULL);
 
-	/* realloc one extra element for the last NULL */
-	arguments = realloc(arguments, (sizeof(char*) * strlen(string)) +1);
-	arguments[n_spaces] = 0;
-
-	// DEBUG
-	for (int i = 0; i < n_spaces; ++i) printf("%s",arguments[i]);	
+	arguments[n_spaces] = NULL;
 
 	return;
 }
 
 // function to spawn a seperate thread via a fork.
-void SpawnFork(pid_t ProcessID)
+void SpawnFork(char* arguments[])
 {
+	assert(arguments!=NULL);
+	pid_t ChildPid;
+
+	switch(ChildPid = fork()){
+		case -1:
+		CurrentStatus = '\0';
+		sprintf(CurrentStatus, "%s %i", "Fork Errored", -1);
+			exit(-1);
+
+		case 0:
+			// Success start Exec
+			SpawnExec(arguments);
+			break;
+
+		default:
+			// Possibly add the WaitPID() function here.
+			break;
+	}
 
 }
 
-// function to spawn the Exec function.
-void SpawnExec(pid_t ProcessID)
+// Function that will spawn off a Fork and pass through down to exec.
+void SpawnForkAndExec(char* arguments[])
 {
+	assert(arguments!=NULL);
 
+	SpawnExec(arguments);
+}
+
+// function to spawn the Exec function.
+void SpawnExec(char* arguments[])
+{
+	assert(arguments!=NULL);
+	execvp(arguments[0],arguments);
 }
 
 // function to hold for a thread via waitpid.
