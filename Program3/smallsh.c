@@ -32,19 +32,21 @@ typedef int bool;
 
 // Program required Built-In Functions
 void ProcessEXIT(int ShellProcs[]);
-int ProcessCD();
+int ProcessCD(char* arguments[]);
 void ProcessSTATUS();
 
 // Utility Functions for executing the program
 bool IsValidCommandLine(char* string);
 void ParseCommandline(char* arguments[], char* string);
+bool IsCommandLineInteral(char* string);
 void SpawnFork(char* arguments[]);
 void SpawnForkAndExec(char* arguments[]);
 void SpawnExec(char* arguments[]);
 void SpawnWaitPid(pid_t ProcessID);
 int getlineClean(char *line, int max);
-// void AddProcessToStack(struct pthread_t* v[], struct pthread_t newProc);
+void replaceProcessID(char *line, int ProcNum);
 void stripLeadingAndTrailingSpaces(char* string);
+char* integer_to_string(int x);
 
 // Supporting Globals to Handle Key resources throughout program.
 char* CurrentStatus;			// Holding string for the message of the current status to feed to GetStatus process.
@@ -74,6 +76,12 @@ int main(int argc, char* argv[])
 		memset(commandLine, '\0', MAXLINE_LENGTH);
 		ReturnVal = getlineClean(commandLine, MAXLINE_LENGTH);
 
+		// Parse and replace the $$ indicator for the current process.
+		if (strstr(commandLine, "$$") != NULL)
+		{
+			replaceProcessID(commandLine, MainPID);
+		}
+
 		if (ReturnVal > 0){
 			// Got something passed into the shell program via stdin.
 			// Check for validity before processing it.
@@ -83,29 +91,43 @@ int main(int argc, char* argv[])
 				// Parse the commandLine into the necessary shell operations.
 				ParseCommandline(ARGS, commandLine);
 
-				// Parse the ARGS to check and see if we have one of the three that we are supposed to handle internaly.
+				// TODO: Parse the ARGS to check and see if we have one of the three that we are supposed to handle internaly.
+				if (IsCommandLineInteral(ARGS[0]))
+				{
+					// Found a function is required to be interanlly implemented.
+					if (strcmp(ARGS[0], "status")==0)
+					{
+						ProcessSTATUS();
+					}else if (strcmp(ARGS[0], "cd")==0)
+					{
+						ProcessCD(ARGS);
+					}else if (strcmp(ARGS[0], "exit")==0)
+					{
+						ProcessEXIT(ShellBgProcs);
+					}else
+					{
+						// TODO: Check to see if this is going to be a background process.
 
+				
+						// Fork the new process to run and perform the necesary operation.
+						switch(ChildPid = fork()){
+							case -1:
+								CurrentStatus = '\0';
+								sprintf(CurrentStatus, "%s %i", "Fork Errored", -1);
+								break;
 
+							case 0:
+								// Success start Exec
+								SpawnExec(ARGS);
+								break;
 
-
-				// Fork the new process to run and perform the necesary operation.
-				switch(ChildPid = fork()){
-					case -1:
-						CurrentStatus = '\0';
-						sprintf(CurrentStatus, "%s %i", "Fork Errored", -1);
-						break;
-
-					case 0:
-						// Success start Exec
-						SpawnExec(ARGS);
-						break;
-
-					default:
-						// Possibly add the WaitPID() function here.
-						fflush(stdout);
-						waitpid(ChildPid, &childExitStatus, 0);
-
-						break;
+							default:
+								// Possibly add the WaitPID() function here.
+								fflush(stdout);
+								waitpid(ChildPid, &childExitStatus, 0);
+								break;
+						}
+					}
 				}
 
 			}
@@ -115,11 +137,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		if (strcmp(commandLine,"exit") == 0) ProcessEXIT(ShellBgProcs);
 	};
-
-	// DEBUG
-	// printf("\nHello World! Away we go...\n");
 
 	return 0;
 };
@@ -128,7 +146,6 @@ int main(int argc, char* argv[])
 // Reads a line and returns length.
 int getlineClean(char *line, int max)
 {
-	// TODO: Implement a feature to prompt the user for input if STDIN is already empty.
 	printf("\n: ");
 
 	if (fgets(line, max, stdin)==NULL)
@@ -136,6 +153,32 @@ int getlineClean(char *line, int max)
 	else{
 		line[strcspn(line,"\n")]='\0';
 		return strlen(line);
+	}
+}
+
+// Function to stripout and replace the $$ in the commandline.
+void replaceProcessID(char *line, int ProcNum)
+{
+	char* Num;
+	char* brk;
+	char* s;
+
+	brk='\0';
+	Num='\0';
+	Num = integer_to_string(ProcNum);
+
+	s=malloc(MAXLINE_LENGTH + 1);
+
+	while(strstr(line, "$$") != NULL)
+	{
+		strncpy(s, line, strcspn(line, "$$"));
+		strcat(s, Num);
+		brk = strstr(line, "$$");
+		// Crop off the "$$"
+		++brk; ++brk;
+		strcat(s, brk);
+
+		strcpy(line, s);
 	}
 }
 
@@ -154,9 +197,45 @@ void ProcessEXIT(int ShellProcs[])
 	IsExit = true;
 	// printf("\nValue of IsExit is: %i\n", IsExit);
 }
-int ProcessCD()
-{
 
+int ProcessCD(char* arguments[])
+{
+	assert(arguments!=NULL);
+	char* s;
+	char* brk;
+	char* TempString;
+
+	s='\0';
+	brk='\0';
+	TempString = '\0';
+
+	if (arguments[1]== 0)
+	{
+		// User just typed 'cd', jump to $HOME environment variable.
+		s = getenv("HOME");
+	}else if (strcmp(arguments[1], "..") == 0)
+	{
+		// User requested up one level on the directory treefrom PWD.
+		s = getenv("PWD");
+		TempString = strrchr(s,'/');
+
+		if (strlen(s)>=1 && TempString != NULL)
+		{
+			*TempString = '\0';
+		}
+	}else if (strchr(arguments[1], '~') != NULL)
+	{
+		// user gave referencial path from the Home directory.
+		s = malloc(strlen(getenv("HOME"))+1);
+		strcpy(s, getenv("HOME"));
+		brk = strpbrk(arguments[1],"/");
+		strcat(s,brk);
+	}
+
+	// DEBUG
+	printf("%s\n", s);
+
+	// TODO: CHDIR to the new path location created within the string s.
 
 	return 0;
 }
@@ -211,6 +290,16 @@ void ParseCommandline(char *arguments[], char* string)
 	return;
 }
 
+// quick function to determine of the command being passed in is one that is internal and implemented within this program.
+bool IsCommandLineInteral(char* string)
+{
+	assert(string != NULL);
+
+	return (strcmp(string, "exit")==0 ||
+			strcmp(string, "cd")==0 ||
+			strcmp(string, "status")==0);
+}
+
 // function to spawn a seperate thread via a fork.
 void SpawnFork(char* arguments[])
 {
@@ -248,6 +337,8 @@ void SpawnExec(char* arguments[])
 {
 	assert(arguments!=NULL);
 	execvp(arguments[0],arguments);
+
+
 }
 
 // function to hold for a thread via waitpid.
@@ -256,20 +347,6 @@ void SpawnWaitPid(pid_t ProcessID)
 
 }
 
-/*
-void AddProcessToStack(struct pthread_t* v[], struct pthread_t newProc)
-{
-	assert(v!=NULL);
-
-	for (int i = 0; i < sizeof(v)/sizeof(struct pthread_t); ++i)
-	{
-		if (v[i]!=NULL)
-		{
-			
-		}
-	}
-}
-*/
 
 // https://stackoverflow.com/questions/352055/best-algorithm-to-strip-leading-and-trailing-spaces-in-c
 void stripLeadingAndTrailingSpaces(char* string)
@@ -295,4 +372,15 @@ void stripLeadingAndTrailingSpaces(char* string)
           --endOfString ;
      }
      *endOfString = '\0';
+}
+
+// REF: https://stackoverflow.com/questions/36274902/convert-int-to-string-in-standard-c
+char* integer_to_string(int x)
+{
+    char* buffer = malloc(sizeof(char) * sizeof(int) * 4 + 1);
+    if (buffer)
+    {
+         sprintf(buffer, "%d", x);
+    }
+    return buffer; // caller is expected to invoke free() on this buffer to release memory
 }
