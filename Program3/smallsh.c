@@ -92,41 +92,39 @@ int main(int argc, char* argv[])
 				ParseCommandline(ARGS, commandLine);
 
 				// TODO: Parse the ARGS to check and see if we have one of the three that we are supposed to handle internaly.
-				if (IsCommandLineInteral(ARGS[0]))
+
+				// Found a function is required to be interanlly implemented.
+				if (strcmp(ARGS[0], "status")==0)
 				{
-					// Found a function is required to be interanlly implemented.
-					if (strcmp(ARGS[0], "status")==0)
-					{
-						ProcessSTATUS();
-					}else if (strcmp(ARGS[0], "cd")==0)
-					{
-						ProcessCD(ARGS);
-					}else if (strcmp(ARGS[0], "exit")==0)
-					{
-						ProcessEXIT(ShellBgProcs);
-					}else
-					{
-						// TODO: Check to see if this is going to be a background process.
+					ProcessSTATUS();
+				}else if (strcmp(ARGS[0], "cd")==0)
+				{
+					ProcessCD(ARGS);
+				}else if (strcmp(ARGS[0], "exit")==0)
+				{
+					ProcessEXIT(ShellBgProcs);
+				}else
+				{
+					// TODO: Check to see if this is going to be a background process.
 
-				
-						// Fork the new process to run and perform the necesary operation.
-						switch(ChildPid = fork()){
-							case -1:
-								CurrentStatus = '\0';
-								sprintf(CurrentStatus, "%s %i", "Fork Errored", -1);
-								break;
+			
+					// Fork the new process to run and perform the necesary operation.
+					switch(ChildPid = fork()){
+						case -1:
+							CurrentStatus = '\0';
+							sprintf(CurrentStatus, "%s %i", "Fork Errored", -1);
+							break;
 
-							case 0:
-								// Success start Exec
-								SpawnExec(ARGS);
-								break;
+						case 0:
+							// Success start Exec
+							SpawnExec(ARGS);
+							break;
 
-							default:
-								// Possibly add the WaitPID() function here.
-								fflush(stdout);
-								waitpid(ChildPid, &childExitStatus, 0);
-								break;
-						}
+						default:
+							// Possibly add the WaitPID() function here.
+							fflush(stdout);
+							waitpid(ChildPid, &childExitStatus, 0);
+							break;
 					}
 				}
 
@@ -160,15 +158,33 @@ int getlineClean(char *line, int max)
 void replaceProcessID(char *line, int ProcNum)
 {
 	char* Num;
-	char* brk;
+	//char* brk;
 	char* s;
+	char* p=strtok(line, " ");
 
-	brk='\0';
+	//brk='\0';
 	Num='\0';
 	Num = integer_to_string(ProcNum);
 
 	s=malloc(MAXLINE_LENGTH + 1);
 
+	while(p!=NULL)
+	{
+		if (strcmp(p,"$$")==0)
+		{
+			strcat(s, Num);
+		}else{
+			strcat(s, p);
+		}
+		strcat(s, " ");
+		p=strtok(NULL," ");
+	}
+
+	stripLeadingAndTrailingSpaces(s);
+
+	strcpy(line, s);
+
+/*  Original string concatenation operation
 	while(strstr(line, "$$") != NULL)
 	{
 		strncpy(s, line, strcspn(line, "$$"));
@@ -180,6 +196,7 @@ void replaceProcessID(char *line, int ProcNum)
 
 		strcpy(line, s);
 	}
+	*/
 }
 
 // Function implementations for the built-in functions.
