@@ -68,12 +68,14 @@ int main(int argc, char* argv[], char* envp[])
 	bool IsBackgroundProc = false;
 	pid_t ChildPid = -5;
 	int childExitStatus = -5;
+	char* TempString;
 
 	// TODO: Are we going to need a MUTEX here to handle process and thread locks.
 	MainPID = getpid();
 	ShellBgProcs[0] = 0;  	// initialize the memory space for the start of the program.
 	SetCurrentStatus(0);
 	StartingPWDENV = getenv("PWD");
+	Redirect(true, true, NULL);
 
 	// DEBUG
 	// printf("Process Thread for smallsh: %i\n", getpid());
@@ -100,13 +102,6 @@ int main(int argc, char* argv[], char* envp[])
 				// Parse the commandLine into the necessary shell operations.
 				ParseCommandline(ARGS, commandLine);
 
-				// Check for redirected STDIN or STDOUT
-				if (strstr(commandLine, "<") != NULL ||
-					strstr(commandLine, ">") != NULL)
-				{
-					Redirect(false, false, commandLine);
-				}
-
 				// Found a function is required to be interanlly implemented.
 				if (strcmp(ARGS[0], "status")==0)
 				{
@@ -117,10 +112,18 @@ int main(int argc, char* argv[], char* envp[])
 				}else if (strcmp(ARGS[0], "exit")==0)
 				{
 					ProcessEXIT(ShellBgProcs);
+					break;
 				}else
 				{
-					// TODO: Check to see if this is going to be a background process.
-
+					// Check for the background process flags
+					IsBackgroundProc = (strcspn(commandLine,"&") < strlen(commandLine)-1) ?  true : false;
+					
+					// Check for redirected STDIN or STDOUT
+					if (strstr(commandLine, "<") != NULL ||
+						strstr(commandLine, ">") != NULL)
+					{
+						Redirect(false, false, commandLine);
+					}
 			
 					// Fork the new process to run and perform the necesary operation.
 					switch(ChildPid = fork()){
@@ -129,16 +132,16 @@ int main(int argc, char* argv[], char* envp[])
 							break;
 
 						case 0:
-							// Check for the background process flags
-							IsBackgroundProc = (strcspn(commandLine,"&") < strlen(commandLine)-1) ?  true : false;
+
+							execvp(ARGS[0], ARGS);
 
 							// Success start Exec
 							if (IsBackgroundProc)
 							{
-								SpawnExec(ARGS);
+								// SpawnExec(ARGS);
 							}else
 							{
-								SpawnExec(ARGS);
+								// SpawnExec(ARGS);
 							}
 							
 							break;
@@ -152,7 +155,6 @@ int main(int argc, char* argv[], char* envp[])
 							break;
 					}
 				}
-
 			}
 			// Handle the line if something odd appeared.
 			else{
@@ -172,6 +174,7 @@ int main(int argc, char* argv[], char* envp[])
 int getlineClean(char *line, int max)
 {
 	printf("\n: ");
+	fflush(stdout);
 
 	if (fgets(line, max, stdin)==NULL)
 		return 0;
@@ -408,7 +411,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 		switch(RedirectCase)
 		{
 			case 1:
-				fd = open(InputString, O_RDONLY);
+				fd = open(InputString, O_RDONLY, 0644);
 				if (fd==-1) {
 					SetCurrentStatus(fd);
 					return;
@@ -430,7 +433,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
 				break;
 			default:
-				fd = open(InputString, O_RDONLY);
+				fd = open(InputString, O_RDONLY, 0644);
 				if (fd==-1) {
 					SetCurrentStatus(fd);
 					return;
