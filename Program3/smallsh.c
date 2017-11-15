@@ -7,6 +7,7 @@
 * Assignment is to create a shell engine in C
 *
 ********************************/
+#define _GNU_SOURCE
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
@@ -34,15 +35,18 @@ typedef int bool;
 void ProcessEXIT(int ShellProcs[]);
 int ProcessCD(char* arguments[]);
 void ProcessSTATUS();
+void SetCurrentStatus(int StatusVal);
 
 // Utility Functions for executing the program
 bool IsValidCommandLine(char* string);
 void ParseCommandline(char* arguments[], char* string);
 bool IsCommandLineInteral(char* string);
-void SpawnFork(char* arguments[]);
-void SpawnForkAndExec(char* arguments[]);
+void Redirect(bool ResetIn, bool ResetOut, char* line);
+// void SpawnFork(char* arguments[]);
+// void SpawnForkAndExec(char* arguments[]);
 void SpawnExec(char* arguments[]);
-void SpawnWaitPid(pid_t ProcessID);
+int SpawnExecBG(char* arguments[]);
+// void SpawnWaitPid(pid_t ProcessID);
 int getlineClean(char *line, int max);
 void replaceProcessID(char *line, int ProcNum);
 void stripLeadingAndTrailingSpaces(char* string);
@@ -50,22 +54,26 @@ char* integer_to_string(int x);
 
 // Supporting Globals to Handle Key resources throughout program.
 char* CurrentStatus;			// Holding string for the message of the current status to feed to GetStatus process.
+char* StartingPWDENV;			// Holding string for the starting value of PWD.
 bool IsExit;
 int MainPID;					// Holding variable for the Main Process ID to be passed to child process as needed to support program requirements.
 
-int main(int argc, char* argv[])
+int main(int argc, char* argv[], char* envp[])
 {
 	IsExit = false;
 	int ReturnVal=-1;
 	char commandLine[MAXLINE_LENGTH];  // read in the stdin put.
 	char* ARGS[516];
 	int ShellBgProcs[256];		// Array to hold the Process Threads running.
+	bool IsBackgroundProc = false;
 	pid_t ChildPid = -5;
 	int childExitStatus = -5;
 
 	// TODO: Are we going to need a MUTEX here to handle process and thread locks.
 	MainPID = getpid();
 	ShellBgProcs[0] = 0;  	// initialize the memory space for the start of the program.
+	SetCurrentStatus((int)0);
+	StartingPWDENV = getenv("PWD");
 
 	// DEBUG
 	// printf("Process Thread for smallsh: %i\n", getpid());
@@ -84,14 +92,13 @@ int main(int argc, char* argv[])
 
 		if (ReturnVal > 0){
 			// Got something passed into the shell program via stdin.
-			// Check for validity before processing it.
+
+			// Check for validity before processing it.			
 			if (IsValidCommandLine(commandLine))
 			{
 				// Handle the commandLine that passed into the shell.
 				// Parse the commandLine into the necessary shell operations.
 				ParseCommandline(ARGS, commandLine);
-
-				// TODO: Parse the ARGS to check and see if we have one of the three that we are supposed to handle internaly.
 
 				// Found a function is required to be interanlly implemented.
 				if (strcmp(ARGS[0], "status")==0)
@@ -116,14 +123,33 @@ int main(int argc, char* argv[])
 							break;
 
 						case 0:
+							// Check for redirected STDIN or STDOUT
+							if (strstr(commandLine, "<") != NULL ||
+								strstr(commandLine, ">") != NULL)
+							{
+								Redirect(false, false, commandLine);
+							}
+
+							// Check for the background process flags
+							IsBackgroundProc = (strcspn(commandLine,"&") < strlen(commandLine)-1) ?  true : false;
+
 							// Success start Exec
-							SpawnExec(ARGS);
+							if (IsBackgroundProc)
+							{
+								SpawnExec(ARGS);
+							}else
+							{
+								SpawnExec(ARGS);
+							}
+							
 							break;
 
 						default:
 							// Possibly add the WaitPID() function here.
 							fflush(stdout);
 							waitpid(ChildPid, &childExitStatus, 0);
+							if (WIFEXITED(childExitStatus)) SetCurrentStatus(WEXITSTATUS(childExitStatus));
+
 							break;
 					}
 				}
@@ -158,11 +184,9 @@ int getlineClean(char *line, int max)
 void replaceProcessID(char *line, int ProcNum)
 {
 	char* Num;
-	//char* brk;
 	char* s;
 	char* p=strtok(line, " ");
 
-	//brk='\0';
 	Num='\0';
 	Num = integer_to_string(ProcNum);
 
@@ -180,23 +204,9 @@ void replaceProcessID(char *line, int ProcNum)
 		p=strtok(NULL," ");
 	}
 
+	// Clean off the trailing space that may have been added in last iteration of the loop.
 	stripLeadingAndTrailingSpaces(s);
-
 	strcpy(line, s);
-
-/*  Original string concatenation operation
-	while(strstr(line, "$$") != NULL)
-	{
-		strncpy(s, line, strcspn(line, "$$"));
-		strcat(s, Num);
-		brk = strstr(line, "$$");
-		// Crop off the "$$"
-		++brk; ++brk;
-		strcat(s, brk);
-
-		strcpy(line, s);
-	}
-	*/
 }
 
 // Function implementations for the built-in functions.
@@ -211,8 +221,11 @@ void ProcessEXIT(int ShellProcs[])
 		}
 	}
 	
+	// Set the directory to the Original PWD.
+	chdir(StartingPWDENV);
+
+	// Set the IsExit flag in case program returns back up into the while loop.
 	IsExit = true;
-	// printf("\nValue of IsExit is: %i\n", IsExit);
 }
 
 int ProcessCD(char* arguments[])
@@ -261,6 +274,12 @@ void ProcessSTATUS()
 	printf("%s\n", CurrentStatus);
 }
 
+// quick setting function to set the value of Current Status.
+void SetCurrentStatus(int StatusVal)
+{
+	sprintf(CurrentStatus, "exit value %i", StatusVal);
+}
+
 // function to parse out the commandLine for validity
 bool IsValidCommandLine(char* string)
 {
@@ -269,7 +288,7 @@ bool IsValidCommandLine(char* string)
 
 	if (Length > MAXLINE_LENGTH) ReturnVal = false;	// Exceeded Maximum Line Length.
 	if (strcspn(string,"(") < Length || strcspn(string,")") < Length) ReturnVal = false;	// Contains the use of Parens like a Subshell.
-	if (strcspn(string,"&") < Length-1 && strcmp(string,"&")==0) ReturnVal = false; // Use of the '&' somewhere other than in the trailing position of function.										
+	if (strcspn(string,"&") < Length-1) ReturnVal = false; // Use of the '&' somewhere other than in the trailing position of function.										
 	if (strcspn(string,"#")==0) ReturnVal = false;	// Comment String nothing to see here move along.
 
 	return ReturnVal;
@@ -317,7 +336,118 @@ bool IsCommandLineInteral(char* string)
 			strcmp(string, "status")==0);
 }
 
+// Used to redirect the Input or Output for Standard IN/OUT
+// Bool reset flag is used to indicated the that proces is supposed to clear the 
+void Redirect(bool ResetIn, bool ResetOut, char* line)
+{
+	assert((ResetIn == false && ResetOut == false) &&
+			line != NULL);
+
+	int RedirectCase = 0;   // Set to 1 for stdin redirect only; 2 for stdout redirect only. 3 for Both.
+	int fd = -5;
+	char* InputString;
+	char* OutputString;
+	char* p;
+	char* stack[3];			// House the tokens for the input string.
+	int i;
+	int ReturnVal;
+
+	InputString = '\0';
+	OutputString = '\0';
+	p = '\0';
+
+	if (ResetIn) dup2(0, STDIN_FILENO);
+	if (ResetOut) dup2(1, STDOUT_FILENO);
+
+	// set input redirect string
+	if (strstr(line, "<") != NULL)
+	{
+		RedirectCase += 1;
+
+		p = strtok(line, "<>");
+		i = 0;
+		while(p!=NULL)
+		{
+			stack[i++]=p;
+			p=strtok(NULL,"<>");
+		}
+
+		// The input string is going to be the part after or between the tokens.
+		strcpy(InputString, stack[1]);
+		stripLeadingAndTrailingSpaces(InputString);
+	}
+
+	// set output redirect string
+	if (strstr(line, ">") != NULL)
+	{
+		RedirectCase += 2;
+
+		p = strtok(line, ">");
+		i = 0;
+		while(p!=NULL)
+		{
+			stack[i++]=p;
+			p=strtok(NULL,">");
+		}
+
+		// The output redirect will be to outside of the edge of the tokens.
+		strcpy(OutputString, stack[1]);
+		stripLeadingAndTrailingSpaces(OutputString);
+	}
+
+	// Based on the value of the Redirect Case, case 1 is stdin; case 2 is stdout; default is both.
+	switch(RedirectCase)
+	{
+		case 1:
+			fd = open(InputString, O_RDONLY | O_CLOEXEC);
+			if (fd==-1) {
+				SetCurrentStatus(fd);
+				return;
+			}
+
+			ReturnVal = dup2(0, fd);
+			close(fd);
+			(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+			break;
+		case 2:
+			fd = open(OutputString, O_WRONLY| O_CREAT | O_TRUNC, 0644);
+			if (fd==-1) {
+				SetCurrentStatus(fd);
+				return;
+			}
+
+			ReturnVal = dup2(1, fd);
+			close(fd);
+			(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+			break;
+		default:
+			fd = open(InputString, O_RDONLY | O_CLOEXEC);
+			if (fd==-1) {
+				SetCurrentStatus(fd);
+				return;
+			}
+
+			ReturnVal = dup2(0, fd);
+			close(fd);
+			(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+
+			fd = open(OutputString, O_WRONLY| O_CREAT | O_TRUNC, 0644);
+			if (fd==-1) {
+				SetCurrentStatus(fd);
+				return;
+			}
+
+			ReturnVal = dup2(1, fd);
+			close(fd);
+			(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+			break;
+	}
+
+	return;
+}
+
 // function to spawn a seperate thread via a fork.
+/*
 void SpawnFork(char* arguments[])
 {
 	assert(arguments!=NULL);
@@ -340,30 +470,47 @@ void SpawnFork(char* arguments[])
 	}
 
 }
+*/
 
 // Function that will spawn off a Fork and pass through down to exec.
+/*
 void SpawnForkAndExec(char* arguments[])
 {
 	assert(arguments!=NULL);
 
 	SpawnExec(arguments);
 }
+*/
 
 // function to spawn the Exec function.
 void SpawnExec(char* arguments[])
 {
+	int ReturnVal;
 	assert(arguments!=NULL);
-	execvp(arguments[0],arguments);
+	ReturnVal = execvp(arguments[0],arguments);
 
+	if (ReturnVal == -1)
+	{
+		SetCurrentStatus(-1);
+	}else{
+		SetCurrentStatus(0);
+	}
+}
 
+// function to spawn the Exec function with a background process and return the Process ID for storage in the Array.
+int SpawnExecBG(char* arguments[])
+{
+
+	return 0;
 }
 
 // function to hold for a thread via waitpid.
+/*
 void SpawnWaitPid(pid_t ProcessID)
 {
 
 }
-
+*/
 
 // https://stackoverflow.com/questions/352055/best-algorithm-to-strip-leading-and-trailing-spaces-in-c
 void stripLeadingAndTrailingSpaces(char* string)
