@@ -72,7 +72,7 @@ int main(int argc, char* argv[], char* envp[])
 	// TODO: Are we going to need a MUTEX here to handle process and thread locks.
 	MainPID = getpid();
 	ShellBgProcs[0] = 0;  	// initialize the memory space for the start of the program.
-	SetCurrentStatus((int)0);
+	SetCurrentStatus(0);
 	StartingPWDENV = getenv("PWD");
 
 	// DEBUG
@@ -100,6 +100,13 @@ int main(int argc, char* argv[], char* envp[])
 				// Parse the commandLine into the necessary shell operations.
 				ParseCommandline(ARGS, commandLine);
 
+				// Check for redirected STDIN or STDOUT
+				if (strstr(commandLine, "<") != NULL ||
+					strstr(commandLine, ">") != NULL)
+				{
+					Redirect(false, false, commandLine);
+				}
+
 				// Found a function is required to be interanlly implemented.
 				if (strcmp(ARGS[0], "status")==0)
 				{
@@ -118,18 +125,10 @@ int main(int argc, char* argv[], char* envp[])
 					// Fork the new process to run and perform the necesary operation.
 					switch(ChildPid = fork()){
 						case -1:
-							CurrentStatus = '\0';
-							sprintf(CurrentStatus, "%s %i", "Fork Errored", -1);
+							SetCurrentStatus(-1);
 							break;
 
 						case 0:
-							// Check for redirected STDIN or STDOUT
-							if (strstr(commandLine, "<") != NULL ||
-								strstr(commandLine, ">") != NULL)
-							{
-								Redirect(false, false, commandLine);
-							}
-
 							// Check for the background process flags
 							IsBackgroundProc = (strcspn(commandLine,"&") < strlen(commandLine)-1) ?  true : false;
 
@@ -146,7 +145,7 @@ int main(int argc, char* argv[], char* envp[])
 
 						default:
 							// Possibly add the WaitPID() function here.
-							fflush(stdout);
+							// fflush(stdout);
 							waitpid(ChildPid, &childExitStatus, 0);
 							if (WIFEXITED(childExitStatus)) SetCurrentStatus(WEXITSTATUS(childExitStatus));
 
@@ -160,6 +159,8 @@ int main(int argc, char* argv[], char* envp[])
 				// printf("INVALID: %s", commandLine);
 			}
 		}
+	// Prepare for the next iteration of the loop.
+	Redirect(true, true, NULL);
 
 	};
 
@@ -277,7 +278,10 @@ void ProcessSTATUS()
 // quick setting function to set the value of Current Status.
 void SetCurrentStatus(int StatusVal)
 {
-	sprintf(CurrentStatus, "exit value %i", StatusVal);
+	char buf[32];
+	char* TempString = integer_to_string(StatusVal);
+	sprintf(buf, "exit value %s", TempString);
+	CurrentStatus = buf;
 }
 
 // function to parse out the commandLine for validity
@@ -301,7 +305,10 @@ void ParseCommandline(char *arguments[], char* string)
 {
 	assert(string!=NULL);
 	int n_spaces=0;
-	char *p = strtok(string, " ");
+	char* TempString;
+	TempString = malloc(MAXLINE_LENGTH + 1);
+	strcpy(TempString, string);
+	char* p = strtok(TempString, " ");
 
 	// Process the tokens in the string.
 	do
@@ -323,6 +330,7 @@ void ParseCommandline(char *arguments[], char* string)
 
 	arguments[n_spaces] = NULL;
 
+	free(TempString);
 	return;
 }
 
@@ -340,9 +348,6 @@ bool IsCommandLineInteral(char* string)
 // Bool reset flag is used to indicated the that proces is supposed to clear the 
 void Redirect(bool ResetIn, bool ResetOut, char* line)
 {
-	assert((ResetIn == false && ResetOut == false) &&
-			line != NULL);
-
 	int RedirectCase = 0;   // Set to 1 for stdin redirect only; 2 for stdout redirect only. 3 for Both.
 	int fd = -5;
 	char* InputString;
@@ -356,93 +361,97 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 	OutputString = '\0';
 	p = '\0';
 
-	if (ResetIn) dup2(0, STDIN_FILENO);
-	if (ResetOut) dup2(1, STDOUT_FILENO);
+	if (ResetIn) dup2(STDIN_FILENO, 0);
+	if (ResetOut) dup2(STDOUT_FILENO, 1);
 
-	// set input redirect string
-	if (strstr(line, "<") != NULL)
+	if (line != NULL)
 	{
-		RedirectCase += 1;
-
-		p = strtok(line, "<>");
-		i = 0;
-		while(p!=NULL)
+		// set input redirect string
+		if (strstr(line, "<") != NULL)
 		{
-			stack[i++]=p;
-			p=strtok(NULL,"<>");
+			RedirectCase += 1;
+
+			p = strtok(line, "<>&");
+			i = 0;
+			while(p!=NULL)
+			{
+				stripLeadingAndTrailingSpaces(p);
+				stack[i++]=p;
+				p=strtok(NULL,"<>&");
+			}
+
+			// The input string is going to be the part after or between the tokens.
+			InputString = stack[1];
+			stripLeadingAndTrailingSpaces(InputString);
 		}
 
-		// The input string is going to be the part after or between the tokens.
-		strcpy(InputString, stack[1]);
-		stripLeadingAndTrailingSpaces(InputString);
-	}
-
-	// set output redirect string
-	if (strstr(line, ">") != NULL)
-	{
-		RedirectCase += 2;
-
-		p = strtok(line, ">");
-		i = 0;
-		while(p!=NULL)
+		// set output redirect string
+		if (strstr(line, ">") != NULL)
 		{
-			stack[i++]=p;
-			p=strtok(NULL,">");
+			RedirectCase += 2;
+
+			p = strtok(line, ">&");
+			i = 0;
+			while(p!=NULL)
+			{
+				stripLeadingAndTrailingSpaces(p);
+				stack[i++]=p;
+				p=strtok(NULL,">&");
+			}
+
+			// The output redirect will be to outside of the edge of the tokens.
+			OutputString = stack[1];
+			stripLeadingAndTrailingSpaces(OutputString);
 		}
 
-		// The output redirect will be to outside of the edge of the tokens.
-		strcpy(OutputString, stack[1]);
-		stripLeadingAndTrailingSpaces(OutputString);
+		// Based on the value of the Redirect Case, case 1 is stdin; case 2 is stdout; default is both.
+		switch(RedirectCase)
+		{
+			case 1:
+				fd = open(InputString, O_RDONLY);
+				if (fd==-1) {
+					SetCurrentStatus(fd);
+					return;
+				}
+
+				ReturnVal = dup2(fd, 0);
+				// close(fd);
+				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+				break;
+			case 2:
+				fd = open(OutputString, O_WRONLY| O_CREAT | O_TRUNC, 0644);
+				if (fd==-1) {
+					SetCurrentStatus(fd);
+					return;
+				}
+
+				ReturnVal = dup2(fd, 1);
+				// close(fd);
+				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+				break;
+			default:
+				fd = open(InputString, O_RDONLY);
+				if (fd==-1) {
+					SetCurrentStatus(fd);
+					return;
+				}
+
+				ReturnVal = dup2(fd, 0);
+				// close(fd);
+				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+
+				fd = open(OutputString, O_WRONLY| O_CREAT | O_TRUNC, 0644);
+				if (fd==-1) {
+					SetCurrentStatus(fd);
+					return;
+				}
+
+				ReturnVal = dup2(fd, 1);
+				// close(fd);
+				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+				break;
+		}
 	}
-
-	// Based on the value of the Redirect Case, case 1 is stdin; case 2 is stdout; default is both.
-	switch(RedirectCase)
-	{
-		case 1:
-			fd = open(InputString, O_RDONLY | O_CLOEXEC);
-			if (fd==-1) {
-				SetCurrentStatus(fd);
-				return;
-			}
-
-			ReturnVal = dup2(0, fd);
-			close(fd);
-			(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
-			break;
-		case 2:
-			fd = open(OutputString, O_WRONLY| O_CREAT | O_TRUNC, 0644);
-			if (fd==-1) {
-				SetCurrentStatus(fd);
-				return;
-			}
-
-			ReturnVal = dup2(1, fd);
-			close(fd);
-			(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
-			break;
-		default:
-			fd = open(InputString, O_RDONLY | O_CLOEXEC);
-			if (fd==-1) {
-				SetCurrentStatus(fd);
-				return;
-			}
-
-			ReturnVal = dup2(0, fd);
-			close(fd);
-			(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
-
-			fd = open(OutputString, O_WRONLY| O_CREAT | O_TRUNC, 0644);
-			if (fd==-1) {
-				SetCurrentStatus(fd);
-				return;
-			}
-
-			ReturnVal = dup2(1, fd);
-			close(fd);
-			(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
-			break;
-	}
-
 	return;
 }
 
