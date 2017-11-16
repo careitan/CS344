@@ -8,6 +8,7 @@
 *
 ********************************/
 #define _GNU_SOURCE
+
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
@@ -35,7 +36,9 @@ typedef int bool;
 void ProcessEXIT(int ShellProcs[]);
 int ProcessCD(char* arguments[]);
 void ProcessSTATUS();
-void SetCurrentStatus(int StatusVal);
+void SetCurrentStatus(int StatusVal, char* message);
+void catchSIGINT(int signo);
+void catchSIGTSTP(int signo);
 
 // Utility Functions for executing the program
 bool IsValidCommandLine(char* string);
@@ -57,6 +60,8 @@ char* CurrentStatus;			// Holding string for the message of the current status t
 char* StartingPWDENV;			// Holding string for the starting value of PWD.
 bool IsExit;
 int MainPID;					// Holding variable for the Main Process ID to be passed to child process as needed to support program requirements.
+int ShellBgProcs[256];		// Array to hold the Process Threads running.
+bool BGProcAllowed;			// Boolean to hold the state flag if BG Processes are allowed.  (Ignore '&' in commandLine).
 
 int main(int argc, char* argv[], char* envp[])
 {
@@ -64,18 +69,27 @@ int main(int argc, char* argv[], char* envp[])
 	int ReturnVal=-1;
 	char commandLine[MAXLINE_LENGTH];  // read in the stdin put.
 	char* ARGS[516];
-	int ShellBgProcs[256];		// Array to hold the Process Threads running.
 	bool IsBackgroundProc = false;
 	pid_t ChildPid = -5;
 	int childExitStatus = -5;
-	char* TempString;
+	// char* TempString;
 
-	// TODO: Are we going to need a MUTEX here to handle process and thread locks.
+	// SigAction definitions for this program.
+	struct sigaction ignore_action = {{0}};
+
+	ignore_action.sa_handler = SIG_IGN;
+
+	sigaction(SIGTERM, &ignore_action, NULL);
+	sigaction(SIGHUP, &ignore_action, NULL);
+	sigaction(SIGQUIT, &ignore_action, NULL);
+
+	// Initialize variables for the start of the main program run.
 	MainPID = getpid();
+	BGProcAllowed = true;
 	ShellBgProcs[0] = 0;  	// initialize the memory space for the start of the program.
-	SetCurrentStatus(0);
+	SetCurrentStatus(0, "exit value");
 	StartingPWDENV = getenv("PWD");
-	Redirect(true, true, NULL);
+	Redirect(true, true, NULL);			// Make sure that STDIN & STDOUT are pointing to their corresponding 0 & 1 file descriptors.
 
 	// DEBUG
 	// printf("Process Thread for smallsh: %i\n", getpid());
@@ -86,12 +100,6 @@ int main(int argc, char* argv[], char* envp[])
 		memset(commandLine, '\0', MAXLINE_LENGTH);
 		ReturnVal = getlineClean(commandLine, MAXLINE_LENGTH);
 
-		// Parse and replace the $$ indicator for the current process.
-		if (strstr(commandLine, "$$") != NULL)
-		{
-			replaceProcessID(commandLine, MainPID);
-		}
-
 		if (ReturnVal > 0){
 			// Got something passed into the shell program via stdin.
 
@@ -99,6 +107,12 @@ int main(int argc, char* argv[], char* envp[])
 			if (IsValidCommandLine(commandLine))
 			{
 				// Handle the commandLine that passed into the shell.
+				// Parse and replace the $$ indicator for the current process.
+				if (strstr(commandLine, "$$") != NULL)
+				{
+					replaceProcessID(commandLine, MainPID);
+				}
+
 				// Parse the commandLine into the necessary shell operations.
 				ParseCommandline(ARGS, commandLine);
 
@@ -119,38 +133,62 @@ int main(int argc, char* argv[], char* envp[])
 					IsBackgroundProc = (strcspn(commandLine,"&") < strlen(commandLine)-1) ?  true : false;
 					
 					// Check for redirected STDIN or STDOUT
+					/*
 					if (strstr(commandLine, "<") != NULL ||
 						strstr(commandLine, ">") != NULL)
 					{
 						Redirect(false, false, commandLine);
 					}
+					*/
 			
 					// Fork the new process to run and perform the necesary operation.
-					switch(ChildPid = fork()){
+					// switch(ChildPid = fork())
+					switch(fork())
+					{
 						case -1:
-							SetCurrentStatus(-1);
+							SetCurrentStatus(-1, "exit value");
 							break;
 
 						case 0:
 
-							execvp(ARGS[0], ARGS);
+							// Check for redirected STDIN or STDOUT
+							if (strstr(commandLine, "<") != NULL ||
+								strstr(commandLine, ">") != NULL)
+							{
+								Redirect(false, false, commandLine);
+							}
 
 							// Success start Exec
-							if (IsBackgroundProc)
+							int result;
+							if (IsBackgroundProc && BGProcAllowed)
 							{
-								// SpawnExec(ARGS);
+								result = execvp(ARGS[0], ARGS);
+								perror("Child exec failure\n");
 							}else
 							{
-								// SpawnExec(ARGS);
+								result = execvp(ARGS[0], ARGS);
+								perror("Child exec failure\n");
 							}
 							
+							return result;
 							break;
 
 						default:
 							// Possibly add the WaitPID() function here.
 							// fflush(stdout);
-							waitpid(ChildPid, &childExitStatus, 0);
-							if (WIFEXITED(childExitStatus)) SetCurrentStatus(WEXITSTATUS(childExitStatus));
+							// pause();
+						
+							ChildPid = waitpid(-1, &childExitStatus, 0);
+							if (ChildPid==-1) SetCurrentStatus(-1, "exit value");
+
+							if  (WIFEXITED(childExitStatus))
+							{
+								SetCurrentStatus(WEXITSTATUS(childExitStatus), strsignal(childExitStatus));
+							}
+							else if (WIFSIGNALED(childExitStatus)) 
+							{
+								SetCurrentStatus(WIFSIGNALED(childExitStatus), strsignal(childExitStatus));
+							}
 
 							break;
 					}
@@ -162,6 +200,7 @@ int main(int argc, char* argv[], char* envp[])
 			}
 		}
 	// Prepare for the next iteration of the loop.
+	// Reset the stdin & stdout
 	Redirect(true, true, NULL);
 
 	};
@@ -278,13 +317,56 @@ void ProcessSTATUS()
 	printf("%s\n", CurrentStatus);
 }
 
-// quick setting function to set the value of Current Status.
-void SetCurrentStatus(int StatusVal)
+// Sigaction handler for what to do when user invokes Ctrl-C.
+void catchSIGINT(int signo)
 {
-	char buf[32];
+	char message[] = "terminated by signal 2";
+
+	//write(STDOUT_FILENO, message, strlen(message));
+	SetCurrentStatus(SIGINT, message);
+	// exit(0);
+}
+
+void catchSIGTSTP(int signo)
+{
+	char* message;
+	if (BGProcAllowed)
+	{
+		message = "Entering foreground-only mode (& is now ignored)";
+		BGProcAllowed = false;
+		write(STDOUT_FILENO, message, strlen(message));
+	}else{
+		message = "Exiting foreground-only mode";
+		BGProcAllowed = true;
+		write(STDOUT_FILENO, message, strlen(message));
+	}
+
+	//exit(0);
+}
+
+// quick setting function to set the value of Current Status.
+void SetCurrentStatus(int StatusVal, char* message)
+{
+	char buf[256];
+	if (message == NULL) message = "";
 	char* TempString = integer_to_string(StatusVal);
 	sprintf(buf, "exit value %s", TempString);
 	CurrentStatus = buf;
+}
+
+// Found on CS344 Piazza by student named Kyleen
+// Modified by Allan Reitan to include checking for Signaled status.
+void showStatus(int childExitMethod) 
+{
+        if(WIFEXITED(childExitMethod))
+        {
+	  		printf("exit value %i\n", WEXITSTATUS(childExitMethod));
+            fflush(stdout);
+        }else if (WIFSIGNALED(childExitMethod))
+        {
+            printf("terminated by signal %i\n", WIFSIGNALED(childExitMethod));
+            fflush(stdout);
+        }
 }
 
 // function to parse out the commandLine for validity
@@ -312,6 +394,7 @@ void ParseCommandline(char *arguments[], char* string)
 	TempString = malloc(MAXLINE_LENGTH + 1);
 	strcpy(TempString, string);
 	char* p = strtok(TempString, " ");
+	bool IsBackgroundProc = false;
 
 	// Process the tokens in the string.
 	do
@@ -331,6 +414,10 @@ void ParseCommandline(char *arguments[], char* string)
 		n_spaces++;
 	}while(p != NULL);
 
+	IsBackgroundProc = (strcspn(string,"&") < strlen(string)-1) ?  true : false;
+	if (IsBackgroundProc && BGProcAllowed) arguments[n_spaces++] = "&";
+
+	// NULL Terminate the ARGS stack
 	arguments[n_spaces] = NULL;
 
 	free(TempString);
@@ -413,45 +500,45 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 			case 1:
 				fd = open(InputString, O_RDONLY, 0644);
 				if (fd==-1) {
-					SetCurrentStatus(fd);
+					SetCurrentStatus(fd, "unable to open STDIN");
 					return;
 				}
 
 				ReturnVal = dup2(fd, 0);
 				// close(fd);
-				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDIN") : SetCurrentStatus(0, "exit value");
 				break;
 			case 2:
-				fd = open(OutputString, O_WRONLY| O_CREAT | O_TRUNC, 0644);
+				fd = open(OutputString, O_WRONLY| O_CREAT | O_APPEND, 0664);
 				if (fd==-1) {
-					SetCurrentStatus(fd);
+					SetCurrentStatus(fd, "unable to open STDOUT");
 					return;
 				}
 
 				ReturnVal = dup2(fd, 1);
 				// close(fd);
-				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDOUT") : SetCurrentStatus(0, "exit value");
 				break;
 			default:
 				fd = open(InputString, O_RDONLY, 0644);
 				if (fd==-1) {
-					SetCurrentStatus(fd);
+					SetCurrentStatus(fd, "unable to open STDIN");
 					return;
 				}
 
 				ReturnVal = dup2(fd, 0);
 				// close(fd);
-				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDIN") : SetCurrentStatus(0, "exit value");
 
-				fd = open(OutputString, O_WRONLY| O_CREAT | O_TRUNC, 0644);
+				fd = open(OutputString, O_WRONLY| O_CREAT | O_APPEND, 0664);
 				if (fd==-1) {
-					SetCurrentStatus(fd);
+					SetCurrentStatus(fd, "unable to open STDOUT");
 					return;
 				}
 
 				ReturnVal = dup2(fd, 1);
 				// close(fd);
-				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal) : SetCurrentStatus(0);
+				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDOUT") : SetCurrentStatus(0, "exit value");
 				break;
 		}
 	}
@@ -503,9 +590,9 @@ void SpawnExec(char* arguments[])
 
 	if (ReturnVal == -1)
 	{
-		SetCurrentStatus(-1);
+		SetCurrentStatus(-1, "exit value");
 	}else{
-		SetCurrentStatus(0);
+		SetCurrentStatus(0, "exit value");
 	}
 }
 
