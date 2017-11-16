@@ -58,6 +58,7 @@ char* integer_to_string(int x);
 // Supporting Globals to Handle Key resources throughout program.
 char* CurrentStatus;			// Holding string for the message of the current status to feed to GetStatus process.
 char* StartingPWDENV;			// Holding string for the starting value of PWD.
+char* StartingHMDENV;			// Holding string for the starting value of HOME.
 bool IsExit;
 int MainPID;					// Holding variable for the Main Process ID to be passed to child process as needed to support program requirements.
 int ShellBgProcs[256];		// Array to hold the Process Threads running.
@@ -89,6 +90,8 @@ int main(int argc, char* argv[], char* envp[])
 	ShellBgProcs[0] = 0;  	// initialize the memory space for the start of the program.
 	SetCurrentStatus(0, "exit value");
 	StartingPWDENV = getenv("PWD");
+	StartingHMDENV = getenv("HOME");
+
 	Redirect(true, true, NULL);			// Make sure that STDIN & STDOUT are pointing to their corresponding 0 & 1 file descriptors.
 
 	// DEBUG
@@ -177,7 +180,7 @@ int main(int argc, char* argv[], char* envp[])
 							// Possibly add the WaitPID() function here.
 							// fflush(stdout);
 							// pause();
-						
+
 							ChildPid = waitpid(-1, &childExitStatus, 0);
 							if (ChildPid==-1) SetCurrentStatus(-1, "exit value");
 
@@ -275,17 +278,17 @@ int ProcessCD(char* arguments[])
 {
 	assert(arguments!=NULL);
 	char* s;
-	char* brk;
+	// char* brk;
 	char* TempString;
 
 	s='\0';
-	brk='\0';
+	// brk='\0';
 	TempString = '\0';
 
 	if (arguments[1]== 0)
 	{
 		// User just typed 'cd', jump to $HOME environment variable.
-		s = getenv("HOME");
+		s = StartingHMDENV;
 	}else if (strcmp(arguments[1], "..") == 0)
 	{
 		// User requested up one level on the directory treefrom PWD.
@@ -299,17 +302,29 @@ int ProcessCD(char* arguments[])
 	}else if (strchr(arguments[1], '~') != NULL)
 	{
 		// user gave referencial path from the Home directory.
-		s = malloc(strlen(getenv("HOME"))+1);
-		strcpy(s, getenv("HOME"));
-		brk = strpbrk(arguments[1],"/");
+		s = malloc(strlen(StartingHMDENV));
+		s = strcpy(s, StartingHMDENV);
+		TempString = strcpy(TempString, arguments[1]);
+		char* brk = strtok(TempString, "~");
 		strcat(s,brk);
+	}else if (strchr(arguments[1], '/') != NULL)
+	{
+		// User requested a subdirectory path from PWD.
+		s = getenv("PWD");
+		strcat(s,arguments[1]);
 	}
 
 	// DEBUG
-	printf("%s\n", s);
+	// printf("%s\n", s);
+	// fflush(stdout);
 
-	// TODO: CHDIR to the new path location created within the string s.
+	chdir(s);
 
+/*
+	if (s!=NULL) free(s);
+	if (brk!=NULL) free(brk);
+	if (TempString!=NULL) free(TempString);
+*/
 	return 0;
 }
 void ProcessSTATUS()
