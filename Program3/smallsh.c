@@ -215,7 +215,7 @@ int main(int argc, char* argv[], char* envp[])
 		}
 	// Prepare for the next iteration of the loop.
 	// Reset the stdin & stdout
-	Redirect(true, true, NULL);
+	// Redirect(true, true, NULL);
 
 	};
 
@@ -279,7 +279,9 @@ void ProcessEXIT(int ShellProcs[])
 	}
 	
 	// Set the directory to the Original PWD.
-	chdir(StartingPWDENV);
+	int ReturnVal = -5;
+	ReturnVal = chdir(StartingPWDENV);
+	if (ReturnVal == 0) setenv("PWD", StartingPWDENV, 1);
 
 	// Set the IsExit flag in case program returns back up into the while loop.
 	IsExit = true;
@@ -296,7 +298,7 @@ int ProcessCD(char* arguments[])
 	// brk='\0';
 	TempString = '\0';
 
-	if (arguments[1]== 0)
+	if (arguments[1]== 0 || strcmp(arguments[1], "~")==0)
 	{
 		// User just typed 'cd', jump to $HOME environment variable.
 		s = StartingHMDENV;
@@ -313,12 +315,15 @@ int ProcessCD(char* arguments[])
 	}else if (strchr(arguments[1], '~') != NULL)
 	{
 		// user gave referencial path from the Home directory.
-		s = malloc(strlen(StartingHMDENV));
-		s = strcpy(s, StartingHMDENV);
+		TempString = malloc(strlen(arguments[1]));
 		TempString = strcpy(TempString, arguments[1]);
+		s = malloc(strlen(StartingHMDENV) + strlen(TempString) + 1);
+		s = strcpy(s, StartingHMDENV);
+
 		char* brk = strtok(TempString, "~");
-		strcat(s,brk);
-	}else if (strchr(arguments[1], '/') != NULL)
+		if (strlen(brk)==0) brk = strtok(NULL, "~");
+		if (brk!=NULL) s = strcat(s,brk);
+	}else
 	{
 		// User requested a subdirectory path from PWD.
 		s = getenv("PWD");
@@ -326,10 +331,22 @@ int ProcessCD(char* arguments[])
 	}
 
 	// DEBUG
-	// printf("%s\n", s);
-	// fflush(stdout);
+	printf("%s\n", s);
 
-	chdir(s);
+	// Execute the Change Directory.
+	int ReturnVal = -5;
+	ReturnVal = chdir(s);
+
+	if (ReturnVal == 0)
+	{
+		SetCurrentStatus(ReturnVal, "exit value");
+		setenv("PWD", s, 1);
+	}else
+	{
+		SetCurrentStatus(ReturnVal, "error value");
+	}
+
+	fflush(stdout);
 
 /*
 	if (s!=NULL) free(s);
