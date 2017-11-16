@@ -76,9 +76,20 @@ int main(int argc, char* argv[], char* envp[])
 	// char* TempString;
 
 	// SigAction definitions for this program.
-	struct sigaction ignore_action = {{0}};
+	struct sigaction SIGINT_action = {{0}}, SIGTSTP_action = {{0}}, ignore_action = {{0}};
+
+	SIGINT_action.sa_handler = catchSIGINT;
+	sigfillset(&SIGINT_action.sa_mask);
+	SIGINT_action.sa_flags = 0;
+
+	SIGTSTP_action.sa_handler = catchSIGINT;
+	sigfillset(&SIGTSTP_action.sa_mask);
+	SIGTSTP_action.sa_flags = 0;
 
 	ignore_action.sa_handler = SIG_IGN;
+
+	sigaction(SIGINT, &SIGINT_action, NULL);
+	sigaction(SIGTSTP, &SIGTSTP_action, NULL);
 
 	sigaction(SIGTERM, &ignore_action, NULL);
 	sigaction(SIGHUP, &ignore_action, NULL);
@@ -92,7 +103,7 @@ int main(int argc, char* argv[], char* envp[])
 	StartingPWDENV = getenv("PWD");
 	StartingHMDENV = getenv("HOME");
 
-	Redirect(true, true, NULL);			// Make sure that STDIN & STDOUT are pointing to their corresponding 0 & 1 file descriptors.
+	// Redirect(true, true, NULL);			// Make sure that STDIN & STDOUT are pointing to their corresponding 0 & 1 file descriptors.
 
 	// DEBUG
 	// printf("Process Thread for smallsh: %i\n", getpid());
@@ -335,11 +346,11 @@ void ProcessSTATUS()
 // Sigaction handler for what to do when user invokes Ctrl-C.
 void catchSIGINT(int signo)
 {
-	char message[] = "terminated by signal 2";
+	char* message = "terminated by signal 2\n";
 
-	//write(STDOUT_FILENO, message, strlen(message));
+	write(STDOUT_FILENO, message, 23);
 	SetCurrentStatus(SIGINT, message);
-	// exit(0);
+	exit(0);
 }
 
 void catchSIGTSTP(int signo)
@@ -347,16 +358,16 @@ void catchSIGTSTP(int signo)
 	char* message;
 	if (BGProcAllowed)
 	{
-		message = "Entering foreground-only mode (& is now ignored)";
+		message = "Entering foreground-only mode (& is now ignored)\n";
 		BGProcAllowed = false;
-		write(STDOUT_FILENO, message, strlen(message));
+		write(STDOUT_FILENO, message, 49);
 	}else{
-		message = "Exiting foreground-only mode";
+		message = "Exiting foreground-only mode\n";
 		BGProcAllowed = true;
-		write(STDOUT_FILENO, message, strlen(message));
+		write(STDOUT_FILENO, message, 29);
 	}
 
-	//exit(0);
+	exit(0);
 }
 
 // quick setting function to set the value of Current Status.
@@ -459,6 +470,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 	char* OutputString;
 	char* p;
 	char* stack[3];			// House the tokens for the input string.
+	char TempString[strlen(line)];
 	int i;
 	int ReturnVal;
 
@@ -471,12 +483,13 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 
 	if (line != NULL)
 	{
+		sprintf(TempString,"%s",line);
 		// set input redirect string
 		if (strstr(line, "<") != NULL)
 		{
 			RedirectCase += 1;
 
-			p = strtok(line, "<>&");
+			p = strtok(TempString, "<>&");
 			i = 0;
 			while(p!=NULL)
 			{
@@ -490,12 +503,13 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 			stripLeadingAndTrailingSpaces(InputString);
 		}
 
+		sprintf(TempString,"%s",line);
 		// set output redirect string
 		if (strstr(line, ">") != NULL)
 		{
 			RedirectCase += 2;
 
-			p = strtok(line, ">&");
+			p = strtok(TempString, ">&");
 			i = 0;
 			while(p!=NULL)
 			{
@@ -519,7 +533,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 					return;
 				}
 
-				ReturnVal = dup2(fd, 0);
+				ReturnVal = dup2(fd, STDIN_FILENO);
 				// close(fd);
 				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDIN") : SetCurrentStatus(0, "exit value");
 				break;
@@ -530,7 +544,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 					return;
 				}
 
-				ReturnVal = dup2(fd, 1);
+				ReturnVal = dup2(fd, STDOUT_FILENO);
 				// close(fd);
 				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDOUT") : SetCurrentStatus(0, "exit value");
 				break;
@@ -541,7 +555,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 					return;
 				}
 
-				ReturnVal = dup2(fd, 0);
+				ReturnVal = dup2(fd, STDIN_FILENO);
 				// close(fd);
 				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDIN") : SetCurrentStatus(0, "exit value");
 
@@ -551,7 +565,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 					return;
 				}
 
-				ReturnVal = dup2(fd, 1);
+				ReturnVal = dup2(fd, STDOUT_FILENO);
 				// close(fd);
 				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDOUT") : SetCurrentStatus(0, "exit value");
 				break;
