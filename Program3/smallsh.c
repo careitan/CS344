@@ -82,7 +82,7 @@ int main(int argc, char* argv[], char* envp[])
 	sigfillset(&SIGINT_action.sa_mask);
 	SIGINT_action.sa_flags = 0;
 
-	SIGTSTP_action.sa_handler = catchSIGINT;
+	SIGTSTP_action.sa_handler = catchSIGTSTP;
 	sigfillset(&SIGTSTP_action.sa_mask);
 	SIGTSTP_action.sa_flags = 0;
 
@@ -91,7 +91,7 @@ int main(int argc, char* argv[], char* envp[])
 	sigaction(SIGINT, &SIGINT_action, NULL);
 	sigaction(SIGTSTP, &SIGTSTP_action, NULL);
 
-	sigaction(SIGTERM, &ignore_action, NULL);
+	// sigaction(SIGTERM, &ignore_action, NULL);
 	sigaction(SIGHUP, &ignore_action, NULL);
 	sigaction(SIGQUIT, &ignore_action, NULL);
 
@@ -127,6 +127,7 @@ int main(int argc, char* argv[], char* envp[])
 					replaceProcessID(commandLine, MainPID);
 				}
 
+				/*
 				// Parse the commandLine into the necessary shell operations.
 				ParseCommandline(ARGS, commandLine);
 
@@ -143,21 +144,13 @@ int main(int argc, char* argv[], char* envp[])
 					break;
 				}else
 				{
+					*/
 					// Check for the background process flags
 					IsBackgroundProc = (strcspn(commandLine,"&") < strlen(commandLine)-1) ?  true : false;
-					
-					// Check for redirected STDIN or STDOUT
-					/*
-					if (strstr(commandLine, "<") != NULL ||
-						strstr(commandLine, ">") != NULL)
-					{
-						Redirect(false, false, commandLine);
-					}
-					*/
 			
 					// Fork the new process to run and perform the necesary operation.
-					// switch(ChildPid = fork())
-					switch(fork())
+					switch(ChildPid = fork())
+					// switch(fork())
 					{
 						case -1:
 							SetCurrentStatus(-1, "exit value");
@@ -172,19 +165,41 @@ int main(int argc, char* argv[], char* envp[])
 								Redirect(false, false, commandLine);
 							}
 
-							// Success start Exec
-							int result;
-							if (IsBackgroundProc && BGProcAllowed)
+							// Parse the commandLine into the necessary shell operations.
+							ParseCommandline(ARGS, commandLine);
+
+							// Found a function is required to be interanlly implemented.
+							if (strcmp(ARGS[0], "status")==0)
 							{
-								result = execvp(ARGS[0], ARGS);
-								perror("Child exec failure\n");
+								ProcessSTATUS();
+							}else if (strcmp(ARGS[0], "cd")==0)
+							{
+								ProcessCD(ARGS);
+							}else if (strcmp(ARGS[0], "exit")==0)
+							{
+								ProcessEXIT(ShellBgProcs);
+								break;
 							}else
 							{
-								result = execvp(ARGS[0], ARGS);
-								perror("Child exec failure\n");
+								// Success start Exec
+								int result;
+								if (IsBackgroundProc && BGProcAllowed)
+								{
+									result = execvp(ARGS[0], ARGS);
+									perror("Child exec failure\n");
+
+									if (result != -1)
+									{
+										printf("\nbackground pid is %i\n", ChildPid);
+									}
+								}else
+								{
+									result = execvp(ARGS[0], ARGS);
+									perror("Child exec failure\n");
+								}
+								
+								return result;
 							}
-							
-							return result;
 							break;
 
 						default:
@@ -192,25 +207,27 @@ int main(int argc, char* argv[], char* envp[])
 							// fflush(stdout);
 							// pause();
 
-							ChildPid = waitpid(-1, &childExitStatus, 0);
-							if (ChildPid==-1) SetCurrentStatus(-1, "exit value");
+							ReturnVal = -5;
+							ReturnVal = waitpid(ChildPid, &childExitStatus, 0);
+							if (ReturnVal==-1) SetCurrentStatus(-1, "exit value");
 
 							if  (WIFEXITED(childExitStatus))
 							{
-								SetCurrentStatus(WEXITSTATUS(childExitStatus), strsignal(childExitStatus));
+								SetCurrentStatus(WEXITSTATUS(childExitStatus), "exit value");
+								printf("\nbackground pid %i is done: ", ChildPid);
+								ProcessSTATUS();
+
 							}
 							else if (WIFSIGNALED(childExitStatus)) 
 							{
-								SetCurrentStatus(WIFSIGNALED(childExitStatus), strsignal(childExitStatus));
+								SetCurrentStatus(WIFSIGNALED(childExitStatus), "terminated by signal");
+								printf("\nbackground pid %i is done: ", ChildPid);
+								ProcessSTATUS();
 							}
 
 							break;
 					}
-				}
-			}
-			// Handle the line if something odd appeared.
-			else{
-				// printf("INVALID: %s", commandLine);
+				/*}*/
 			}
 		}
 	// Prepare for the next iteration of the loop.
@@ -219,6 +236,8 @@ int main(int argc, char* argv[], char* envp[])
 
 	};
 
+	// Send out KILLPG to group based on root PID.
+	ReturnVal = killpg(MainPID, SIGKILL);
 	return 0;
 };
 
@@ -326,12 +345,23 @@ int ProcessCD(char* arguments[])
 	}else
 	{
 		// User requested a subdirectory path from PWD.
-		s = getenv("PWD");
-		strcat(s,arguments[1]);
+		TempString = malloc(strlen(arguments[1]));
+		TempString = strcpy(TempString, arguments[1]);
+		s = malloc(strlen(getenv("PWD")) + strlen(TempString) + 1);
+		s = strcpy(s, getenv("PWD"));
+		if(strspn(TempString, "/")==1){
+			// Found a '/' at the beggining of the path string.
+			strcat(s,TempString);
+		} else
+		{
+			// Not '/' found at beginning, need to add it.
+			strcat(s,"/");
+			strcat(s,TempString);
+		}
 	}
 
 	// DEBUG
-	printf("%s\n", s);
+	// printf("%s\n", s);
 
 	// Execute the Change Directory.
 	int ReturnVal = -5;
@@ -347,12 +377,6 @@ int ProcessCD(char* arguments[])
 	}
 
 	fflush(stdout);
-
-/*
-	if (s!=NULL) free(s);
-	if (brk!=NULL) free(brk);
-	if (TempString!=NULL) free(TempString);
-*/
 	return 0;
 }
 void ProcessSTATUS()
@@ -367,7 +391,7 @@ void catchSIGINT(int signo)
 
 	write(STDOUT_FILENO, message, 23);
 	SetCurrentStatus(SIGINT, message);
-	exit(0);
+	// exit(0);
 }
 
 void catchSIGTSTP(int signo)
@@ -375,16 +399,16 @@ void catchSIGTSTP(int signo)
 	char* message;
 	if (BGProcAllowed)
 	{
-		message = "Entering foreground-only mode (& is now ignored)\n";
+		message = "\nEntering foreground-only mode (& is now ignored)\n";
 		BGProcAllowed = false;
-		write(STDOUT_FILENO, message, 49);
+		write(STDOUT_FILENO, message, 50);
 	}else{
-		message = "Exiting foreground-only mode\n";
+		message = "\nExiting foreground-only mode\n";
 		BGProcAllowed = true;
-		write(STDOUT_FILENO, message, 29);
+		write(STDOUT_FILENO, message, 30);
 	}
 
-	exit(0);
+	// exit(0);
 }
 
 // quick setting function to set the value of Current Status.
@@ -393,7 +417,7 @@ void SetCurrentStatus(int StatusVal, char* message)
 	char buf[256];
 	if (message == NULL) message = "";
 	char* TempString = integer_to_string(StatusVal);
-	sprintf(buf, "exit value %s", TempString);
+	sprintf(buf, "%s %s",message, TempString);
 	CurrentStatus = buf;
 }
 
@@ -550,7 +574,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 					return;
 				}
 
-				ReturnVal = dup2(fd, STDIN_FILENO);
+				ReturnVal = dup2(fd, 0);
 				// close(fd);
 				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDIN") : SetCurrentStatus(0, "exit value");
 				break;
@@ -561,7 +585,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 					return;
 				}
 
-				ReturnVal = dup2(fd, STDOUT_FILENO);
+				ReturnVal = dup2(fd, 1);
 				// close(fd);
 				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDOUT") : SetCurrentStatus(0, "exit value");
 				break;
@@ -572,7 +596,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 					return;
 				}
 
-				ReturnVal = dup2(fd, STDIN_FILENO);
+				ReturnVal = dup2(fd, 0);
 				// close(fd);
 				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDIN") : SetCurrentStatus(0, "exit value");
 
@@ -582,7 +606,7 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 					return;
 				}
 
-				ReturnVal = dup2(fd, STDOUT_FILENO);
+				ReturnVal = dup2(fd, 1);
 				// close(fd);
 				(ReturnVal == -1) ? SetCurrentStatus(ReturnVal, "unable to redirect STDOUT") : SetCurrentStatus(0, "exit value");
 				break;
@@ -590,42 +614,6 @@ void Redirect(bool ResetIn, bool ResetOut, char* line)
 	}
 	return;
 }
-
-// function to spawn a seperate thread via a fork.
-/*
-void SpawnFork(char* arguments[])
-{
-	assert(arguments!=NULL);
-	pid_t ChildPid;
-
-	switch(ChildPid = fork()){
-		case -1:
-		CurrentStatus = '\0';
-		sprintf(CurrentStatus, "%s %i", "Fork Errored", -1);
-			exit(-1);
-
-		case 0:
-			// Success start Exec
-			SpawnExec(arguments);
-			break;
-
-		default:
-			// Possibly add the WaitPID() function here.
-			break;
-	}
-
-}
-*/
-
-// Function that will spawn off a Fork and pass through down to exec.
-/*
-void SpawnForkAndExec(char* arguments[])
-{
-	assert(arguments!=NULL);
-
-	SpawnExec(arguments);
-}
-*/
 
 // function to spawn the Exec function.
 void SpawnExec(char* arguments[])
@@ -649,13 +637,6 @@ int SpawnExecBG(char* arguments[])
 	return 0;
 }
 
-// function to hold for a thread via waitpid.
-/*
-void SpawnWaitPid(pid_t ProcessID)
-{
-
-}
-*/
 
 // https://stackoverflow.com/questions/352055/best-algorithm-to-strip-leading-and-trailing-spaces-in-c
 void stripLeadingAndTrailingSpaces(char* string)
