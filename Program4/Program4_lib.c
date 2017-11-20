@@ -19,7 +19,115 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-
+// Begin Function Definitions
 typedef int bool;
 #define true  0
 #define false 1
+
+
+
+
+// REF: https://stackoverflow.com/questions/36274902/convert-int-to-string-in-standard-c
+char* integer_to_string(int x)
+{
+    char* buffer = malloc(sizeof(char) * sizeof(int) * 4 + 1);
+    if (buffer)
+    {
+         sprintf(buffer, "%d", x);
+    }
+    return buffer; // caller is expected to invoke free() on this buffer to release memory
+}
+
+// https://stackoverflow.com/questions/822323/how-to-generate-a-random-number-in-c/39475626#39475626
+int RandomNumber(int min_num, int max_num)
+{
+    int result = 0, low_num = 0, hi_num = 0;
+
+    if (min_num < max_num)
+    {
+        low_num = min_num;
+        hi_num = max_num + 1; // include max_num in output
+    } else {
+        low_num = max_num + 1; // include max_num in output
+        hi_num = min_num;
+    }
+
+    result = (rand() % (hi_num - low_num)) + low_num;
+    return result;
+}
+
+// Redirect STDIN to the file name provided.
+// Returns True / False to indicate if it did so with out any error.
+// Function will assume that the full path to the filename is given.
+bool RedirectInput(char* FileName)
+{
+	assert(FileName != NULL);
+	int fd = -5;
+
+	fd = open(FileName, O_RDONLY, 0644);
+	if (fd==-1){
+		fprintf(stderr, "Unable to Open File named: %s\n", FileName);
+		return false;
+	}
+
+	if (dup2(fd, 0)==-1)
+	{
+		fprintf(stderr, "Unable to Redirect STDIN to File named: %s\n", FileName);
+		return false;
+	}else{
+		close(fd);
+		return true;
+	}
+}
+
+// Redirect STDOUT to the file name provided.
+// Returns True / False to indicate if it did so with out any error.
+// Function will assume that the full path to the filename is given.
+bool RedirectOutput(char* FileName)
+{
+	assert(FileName != NULL);
+	int fd = -5;
+
+	fd = open(FileName, O_RDONLY, 0644);
+	if (fd==-1){
+		fprintf(stderr, "Unable to Open File named: %s\n", FileName);
+		return false;
+	}
+
+	if (dup2(fd, 1)==-1)
+	{
+		fprintf(stderr, "Unable to Redirect STDOUT to File named: %s\n", FileName);
+		return false;
+	}else{
+		close(fd);
+		return true;
+	}
+}
+
+// https://stackoverflow.com/questions/352055/best-algorithm-to-strip-leading-and-trailing-spaces-in-c
+void stripLeadingAndTrailingSpaces(char* string)
+{
+     assert(string);
+
+     /* First remove leading spaces */
+     const char* firstNonSpace = string;
+
+     while(*firstNonSpace != '\0' && isspace(*firstNonSpace))
+     {
+          ++firstNonSpace;
+     }
+
+     size_t len = strlen(firstNonSpace)+1;         
+     memmove(string, firstNonSpace, len);
+
+     /* Now remove trailing spaces */
+     char* endOfString = string + len;
+
+     while(string < endOfString  && isspace(*endOfString))
+     {
+          --endOfString ;
+     }
+     *endOfString = '\0';
+}
+
+
