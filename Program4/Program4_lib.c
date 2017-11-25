@@ -130,7 +130,7 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
 
     if (FN)
     {
-        while((ch=getch(FN)) != EOF){
+        while((ch=getc(FN)) != EOF){
             if (ch != '\n') ++FNCount;
         }
     }else{
@@ -139,14 +139,17 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
 
     if (KF)
     {
-        while((ch=getch(KF)) != EOF){
+        while((ch=getc(KF)) != EOF){
             if (ch != '\n') ++KFCount;
         }
     }else{
         fprintf(stderr, "Failed to open the file for counting: %s\n", KeyFile);
     }
 
-    ReturnVal = (FNCount <= KFCount) ? true : false;
+    ReturnVal = (FNCount <= KFCount) ? 0 : 1;
+    // DEBUG
+    printf("DEBUG Values, FNCount: %i; KFCount: %i \n", FNCount, KFCount);
+    printf("DEBUG Value of ReturnVal %i \n", ReturnVal);
 
     return ReturnVal;
 }

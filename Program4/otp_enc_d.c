@@ -8,6 +8,9 @@
 #define _GNU_SOURCE
 
 #define NET_READ_BUFFER 2048
+typedef int bool;
+#define true  0
+#define false 1
 
 #include "Program4_lib.h"
 #include "dynamicArray.h"
@@ -54,7 +57,7 @@ int main(int argc, char* argv[])
 	if (establishedConnectionFD < 0) error("ERROR on accept");
 
 	// TODO: Fork at this point and use a child process to handle the process of the file stream.
-	
+
 	// Get the message from the client and display it
 	memset(buffer, '\0', NET_READ_BUFFER+1);
 	charsRead = recv(establishedConnectionFD, buffer, NET_READ_BUFFER, 0); // Read the client's message from the socket
