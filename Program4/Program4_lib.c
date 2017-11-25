@@ -25,8 +25,6 @@ typedef int bool;
 #define false 1
 
 
-
-
 // REF: https://stackoverflow.com/questions/36274902/convert-int-to-string-in-standard-c
 char* integer_to_string(int x)
 {
@@ -104,6 +102,55 @@ bool RedirectOutput(char* FileName)
 	}
 }
 
+// Get the file descriptor of the FileName given.  If it is unable to be accessed, then 
+int GetFileDescriptorRead(char* FileName)
+{   
+    int ReturnVal = open(FileName, O_RDONLY);
+    if (ReturnVal == -1) fprintf(stderr, "Unable to open file, %s\n",FileName);
+
+    return ReturnVal;
+}
+
+// file content length counter based on C Routine found at:
+// http://www.opentechguides.com/how-to/article/c/72/c-file-counts.html
+bool IsValidFileSet(char* FileName, char* KeyFile)
+{
+    assert (FileName != NULL && KeyFile != NULL);
+    bool ReturnVal = false;
+    char ch;
+
+    FILE *FN, *KF;
+
+    int FNCount, KFCount;
+    FNCount = 0;
+    KFCount = 0;
+
+    FN = fopen(FileName, "r");
+    KF = fopen(KeyFile, "r");
+
+    if (FN)
+    {
+        while((ch=getch(FN)) != EOF){
+            if (ch != '\n') ++FNCount;
+        }
+    }else{
+        fprintf(stderr, "Failed to open the file for counting: %s\n", FileName);
+    }
+
+    if (KF)
+    {
+        while((ch=getch(KF)) != EOF){
+            if (ch != '\n') ++KFCount;
+        }
+    }else{
+        fprintf(stderr, "Failed to open the file for counting: %s\n", KeyFile);
+    }
+
+    ReturnVal = (FNCount <= KFCount) ? true : false;
+
+    return ReturnVal;
+}
+
 // https://stackoverflow.com/questions/352055/best-algorithm-to-strip-leading-and-trailing-spaces-in-c
 void stripLeadingAndTrailingSpaces(char* string)
 {
@@ -130,4 +177,9 @@ void stripLeadingAndTrailingSpaces(char* string)
      *endOfString = '\0';
 }
 
-
+// Error function used for reporting issues
+void error(const char *msg) 
+{
+    perror(msg); 
+    exit(0); 
+} 

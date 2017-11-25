@@ -16,5 +16,7 @@ char* integer_to_string(int x);
 int RandomNumber(int min_num, int max_num);
 bool RedirectInput(char* FileName);
 bool RedirectOutput(char* FileName);
+int GetFileDescriptorRead(char* FileName);
+bool IsValidFileSet(char* FileName, char* KeyFile);
 void stripLeadingAndTrailingSpaces(char* string);
-
+void error(const char *msg);
