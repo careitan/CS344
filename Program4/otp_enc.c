@@ -7,6 +7,7 @@
 *****************************************/
 #define _GNU_SOURCE
 #define NET_READ_BUFFER 2048
+#define MAX_FILE_NAME 256
 
 typedef int bool;
 #define true  0
@@ -28,12 +29,13 @@ int main(int argc, char* argv[])
 	struct sockaddr_in serverAddress;
 	struct hostent* serverHostInfo;
 	char buffer[NET_READ_BUFFER+1];
+	char filebuffer[MAX_FILE_NAME];
 	bool IsFilesValid = false;
     
 	if (argc < 4) { fprintf(stderr,"USAGE: %s inputfile keyfile port\n", argv[0]); exit(0); } // Check usage & args
 
 	IsFilesValid = IsValidFileSet(argv[1], argv[2]);
-	if (IsFilesValid != 0) { fprintf(stderr, "ERROR Detected, File is Larger than Key.\n"); exit(0); }
+	if (IsFilesValid != 0) { fprintf(stderr, "ERROR Detected, Input Files area invalid.\n"); exit(0); }
 
 	// Set up the server address struct
 	memset((char*)&serverAddress, '\0', sizeof(serverAddress)); // Clear out the address struct
@@ -46,23 +48,50 @@ int main(int argc, char* argv[])
 
 	// Set up the socket
 	socketFD = socket(AF_INET, SOCK_STREAM, 0); // Create the socket
-	if (socketFD < 0) error("CLIENT: ERROR opening socket");
+	if (socketFD < 0) { error("ERROR creating socket on port provided."); exit(2); }
 	
 	// Connect to server
-	if (connect(socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) // Connect socket to address
-		error("CLIENT: ERROR connecting");
+	if (connect(socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0){
+		error("CLIENT: ERROR connecting to server on port provided.");
+		exit(2);
+	}
+
+	// Send up the File Names as Headers first
+	/*
+	memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer array
+	memset(filebuffer, '\0', sizeof(filebuffer)); // Clear out the buffer array
+	strcpy(filebuffer, argv[1]);
+	strcat(filebuffer, "_srv#srv_");
+	strcat(filebuffer, argv[2]);
+	strcpy(buffer, filebuffer);
+	charsWritten = send(socketFD, buffer, strlen(buffer), 0); // Write to the server
+	if (charsWritten < 0) error("CLIENT: ERROR writing to socket");
+	if (charsWritten < strlen(buffer)) printf("CLIENT: WARNING: Not all data (File Names) written to socket!\n");
+	*/
 
 	// loop through the two files to upload.
 	for (int i = 1; i < 3; ++i)
-	{	
-		// TODO: Replace this with a read from the input files
+	{			
+		// Send up the name of the file as starting Sentinel of the stream.
+		memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer array
+		memset(filebuffer, '\0', sizeof(filebuffer)); // Clear out the buffer array
+		strcpy(filebuffer, "##");
+		strcat(filebuffer, argv[i]);
+		strcat(filebuffer, "_srv##");
+		strcpy(buffer, filebuffer);
+		charsWritten = send(socketFD, buffer, strlen(buffer), 0); // Write to the server
+		if (charsWritten < 0) error("CLIENT: ERROR writing to socket");
+		if (charsWritten < strlen(buffer)) printf("CLIENT: WARNING: Not all data (File Names) written to socket!\n");
+		sleep(1);
+
 		int FileUpload = GetFileDescriptorRead(argv[i]);
 
 		if (FileUpload > 0)
 		{
 			memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer array
 
-			while (read(FileUpload, buffer, NET_READ_BUFFER) >= 0){
+			while (read(FileUpload, buffer, NET_READ_BUFFER) != 0){
+				buffer[strcspn(buffer, "\n")] = '\0'; // Remove the trailing \n that maybe in the file.
 				// Send message to server
 				charsWritten = send(socketFD, buffer, strlen(buffer), 0); // Write to the server
 				if (charsWritten < 0) error("CLIENT: ERROR writing to socket");
@@ -74,23 +103,26 @@ int main(int argc, char* argv[])
 		}else{
 			fprintf(stderr, "Unable to access for upload: %s\n", argv[i]);
 		}
-
+		// Pause long enough to let the server process the last block that was sent up.
+		sleep(1);
 	}
+	
+	// Send Termination String to the Server
+	// sleep(1);
+	send(socketFD, "@@TERM@@", strlen("@@TERM@@"), 0);
 
 	// Get return message from server
-	// TODO: Build this up as a while loop.
 	memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer again for reuse
 
 	// Read data from the socket, leaving \0 at end
-	while((charsRead = recv(socketFD, buffer, NET_READ_BUFFER, 0)) != EOF){
-		
-		if (charsRead < 0) error("CLIENT: ERROR reading from socket");
+	while((charsRead = recv(socketFD, buffer, NET_READ_BUFFER, 0)) >= 0){
 
 		// push buffer to stdout for writting to output file.
 		fprintf(stdout, "%s", buffer);
 		memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer again for reuse
 		charsRead = (charsRead == 0)? -1 : charsRead;
 	}
+	if (charsRead < 0) error("CLIENT: ERROR reading from socket");
 
 	close(socketFD); // Close the socket
 

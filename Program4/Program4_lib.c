@@ -131,7 +131,15 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
     if (FN)
     {
         while((ch=getc(FN)) != EOF){
-            if (ch != '\n') ++FNCount;
+            if ((ch >= 'A' && ch <= 'Z') || isspace(ch))
+            {
+                if (ch != '\n') ++FNCount;
+            }else{
+                fprintf(stderr, "Invalid Character detected in the Source file.\n");
+                fclose(FN);
+                fclose(KF);
+                return 1;
+            }
         }
     }else{
         fprintf(stderr, "Failed to open the file for counting: %s\n", FileName);
@@ -140,13 +148,24 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
     if (KF)
     {
         while((ch=getc(KF)) != EOF){
-            if (ch != '\n') ++KFCount;
+            if ((ch >= 'A' && ch <= 'Z') || isspace(ch))
+            {
+                if (ch != '\n') ++KFCount;
+            }else{
+                fprintf(stderr, "Invalid Character detected in the Key file.\n");
+                fclose(FN);
+                fclose(KF);
+                return 1;
+            }
         }
     }else{
         fprintf(stderr, "Failed to open the file for counting: %s\n", KeyFile);
     }
 
-    ReturnVal = (FNCount <= KFCount) ? 0 : 1;
+    ReturnVal = (FNCount <= KFCount)? 0 : 1;
+    fclose(FN);
+    fclose(KF);
+
     // DEBUG
     printf("DEBUG Values, FNCount: %i; KFCount: %i \n", FNCount, KFCount);
     printf("DEBUG Value of ReturnVal %i \n", ReturnVal);
