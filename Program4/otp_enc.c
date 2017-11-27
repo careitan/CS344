@@ -115,12 +115,11 @@ int main(int argc, char* argv[])
 	memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer again for reuse
 
 	// Read data from the socket, leaving \0 at end
-	while((charsRead = recv(socketFD, buffer, NET_READ_BUFFER, 0)) >= 0){
+	while((charsRead = recv(socketFD, buffer, NET_READ_BUFFER, 0)) > 0){
 
 		// push buffer to stdout for writting to output file.
 		fprintf(stdout, "%s", buffer);
 		memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer again for reuse
-		charsRead = (charsRead == 0)? -1 : charsRead;
 	}
 	if (charsRead < 0) error("CLIENT: ERROR reading from socket");
 

@@ -220,6 +220,7 @@ int EncryptData(int FileP, int KeyP, int ResultP)
 	char SourceChar[2];
 	char KeyChar[2];
 	int PlainVal, KeyVal, EncryptedVal;
+	bool IsTerminated = false;
 
 	char chars[28] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -231,39 +232,52 @@ int EncryptData(int FileP, int KeyP, int ResultP)
 	lseek(KeyP,0,SEEK_SET);
 	lseek(ResultP,0,SEEK_SET);
 
-
-	while(read(FileP, SourceChar, 1) != EOF)
+	do
 	{
+		memset(SourceChar,'\0',2);
+		read(FileP, SourceChar, 1);
 		memset(KeyChar,'\0',2);
 		read(KeyP, KeyChar, 1);
 
-		// DEBUG
-		printf("SourceChar : %s  KeyChar : %s ;\t", SourceChar, KeyChar);
-
-		if (isspace(SourceChar[1]))
+		if (strcmp(&SourceChar[0], "\n") == 0)
 		{
-			PlainVal = 0;
-		}else{
-			PlainVal =  SourceChar[1] - 64;		
+			IsTerminated = true;
 		}
 
-		if (isspace(KeyChar[1]))
+		switch (IsTerminated)
 		{
-			KeyVal = 0;
-		}else{
-			KeyVal =  KeyChar[1] - 64;		
-		}
+		case 0:
+		// IsTerminated tripped by endline.
+			break;
+		default:
+		// Process Char.
+			if (isspace(SourceChar[0]))
+			{
+				PlainVal = 0;
+			}else{
+				PlainVal =  SourceChar[0] - 64;		
+			}
 
-		EncryptedVal = PlainVal + KeyVal;
+			if (isspace(KeyChar[0]))
+			{
+				KeyVal = 0;
+			}else{
+				KeyVal =  KeyChar[0] - 64;		
+			}
 
-		while(EncryptedVal > 27) EncryptedVal -=27;
+			EncryptedVal = PlainVal + KeyVal;
 
-		EncryptedVal %= 27;
+			while(EncryptedVal > 27) EncryptedVal -=27;
 
-		ReturnVal += write(ResultP, &chars[EncryptedVal], 1);
+			EncryptedVal %= 27;
 
-		memset(SourceChar,'\0',2);
-	}
+			ReturnVal += write(ResultP, &chars[EncryptedVal], 1);
+			break;
+		}		
+	}while(IsTerminated != 0);
+
+	// Write a final Newline character to exit the function and terminate the string in the results value.
+	write(ResultP, "\n", 1);
 
 	return ReturnVal;
 }
@@ -273,19 +287,19 @@ int EncryptData(int FileP, int KeyP, int ResultP)
 // Adapted by Allan Reitan to use:
 // 1. file pointer instead of a char buffer array.
 // 2. Rearranged the Char Buffer to make index 0 a space.
-// 3. Function assumes that user has already verified that the key file is equal or longer than the source.
 // Function uses a basic Modulo 27 operation to come up with the encrypted value.
 int DecryptData(int FileP, int KeyP, int ResultP)
 {
 	int ReturnVal = 0;
-	char SourceChar[1];
-	char KeyChar[1];
+	char SourceChar[2];
+	char KeyChar[2];
 	int PlainVal, KeyVal, EncryptedVal;
+	bool IsTerminated = false;
 
 	char chars[28] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-	memset(SourceChar,'\0',1);
-	memset(KeyChar,'\0',1);
+	memset(SourceChar,'\0',2);
+	memset(KeyChar,'\0',2);
 
 	// Setup the file pointers for the necessary work.
 	lseek(FileP,0,SEEK_SET);
@@ -293,36 +307,53 @@ int DecryptData(int FileP, int KeyP, int ResultP)
 	lseek(ResultP,0,SEEK_SET);
 
 	// FileP is the encrypted input and the ResultP will point to translated string.
-	while(read(FileP, SourceChar, 1) != EOF)
+
+	do
 	{
-		memset(KeyChar,'\0',1);
+		memset(SourceChar,'\0',2);
+		read(FileP, SourceChar, 1);
+		memset(KeyChar,'\0',2);
 		read(KeyP, KeyChar, 1);
 
-		// DEBUG
-		printf("SourceChar : %s  KeyChar : %s ;\t", SourceChar, KeyChar);
-
-		if (isspace(SourceChar[1]))
+		if (strcmp(&SourceChar[0], "\n") == 0)
 		{
-			PlainVal = 0;
-		}else{
-			PlainVal =  SourceChar[1] - 64;		
+			IsTerminated = true;
 		}
 
-		if (isspace(KeyChar[1]))
+		switch (IsTerminated)
 		{
-			KeyVal = 0;
-		}else{
-			KeyVal =  KeyChar[1] - 64;		
-		}
+		case 0:
+		// IsTerminated tripped by endline.
+			break;
+		default:
+		// Process Char.
+			if (isspace(SourceChar[0]))
+			{
+				PlainVal = 0;
+			}else{
+				PlainVal =  SourceChar[0] - 64;		
+			}
 
-		EncryptedVal = PlainVal + KeyVal;
+			if (isspace(KeyChar[0]))
+			{
+				KeyVal = 0;
+			}else{
+				KeyVal =  KeyChar[0] - 64;		
+			}
 
-		while(EncryptedVal > 27) EncryptedVal -=27;
+			EncryptedVal = PlainVal - KeyVal;
 
-		EncryptedVal %= 27;
+			while(EncryptedVal < 0) EncryptedVal +=27;
 
-		ReturnVal += write(ResultP, &chars[EncryptedVal], 1);
-	}
+			EncryptedVal %= 27;
+
+			ReturnVal += write(ResultP, &chars[EncryptedVal], 1);
+			break;
+		}		
+	}while(IsTerminated != 0);
+
+	// Write a final Newline character to exit the function and terminate the string in the results value.
+	write(ResultP, "\n", 1);
 
 	return ReturnVal;
 }
