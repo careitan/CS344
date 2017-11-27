@@ -11,7 +11,6 @@ typedef int bool;
 #define true  0
 #define false 1
 
-
 char* integer_to_string(int x);
 int RandomNumber(int min_num, int max_num);
 bool RedirectInput(char* FileName);
@@ -20,5 +19,5 @@ int GetFileDescriptorRead(char* FileName);
 bool IsValidFileSet(char* FileName, char* KeyFile);
 void stripLeadingAndTrailingSpaces(char* string);
 void error(const char *msg);
-int EncryptData(int FileP, int KeyP);
-int DecryptData(int FileP, int KeyP);
+int EncryptData(int FileP, int KeyP, int ResultP);
+int DecryptData(int FileP, int KeyP, int ResultP);

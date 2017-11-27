@@ -9,6 +9,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <limits.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <math.h>
@@ -211,18 +212,19 @@ void error(const char *msg)
 // Adapted by Allan Reitan to use:
 // 1. file pointer instead of a char buffer array.
 // 2. Rearranged the Char Buffer to make index 0 a space.
+// 3. Function assumes that user has already verified that the key file is equal or longer than the source.
 // Function uses a basic Modulo 27 operation to come up with the encrypted value.
 int EncryptData(int FileP, int KeyP, int ResultP)
 {
 	int ReturnVal = 0;
-	char SourceChar[1];
-	char KeyChar[1];
+	char SourceChar[2];
+	char KeyChar[2];
 	int PlainVal, KeyVal, EncryptedVal;
 
 	char chars[28] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-	memset(SourceChar,'\0',1);
-	memset(KeyChar,'\0',1);
+	memset(SourceChar,'\0',2);
+	memset(KeyChar,'\0',2);
 
 	// Setup the file pointers for the necessary work.
 	lseek(FileP,0,SEEK_SET);
@@ -232,7 +234,7 @@ int EncryptData(int FileP, int KeyP, int ResultP)
 
 	while(read(FileP, SourceChar, 1) != EOF)
 	{
-		memset(KeyChar,'\0',1);
+		memset(KeyChar,'\0',2);
 		read(KeyP, KeyChar, 1);
 
 		// DEBUG
@@ -259,6 +261,8 @@ int EncryptData(int FileP, int KeyP, int ResultP)
 		EncryptedVal %= 27;
 
 		ReturnVal += write(ResultP, &chars[EncryptedVal], 1);
+
+		memset(SourceChar,'\0',2);
 	}
 
 	return ReturnVal;
@@ -269,6 +273,7 @@ int EncryptData(int FileP, int KeyP, int ResultP)
 // Adapted by Allan Reitan to use:
 // 1. file pointer instead of a char buffer array.
 // 2. Rearranged the Char Buffer to make index 0 a space.
+// 3. Function assumes that user has already verified that the key file is equal or longer than the source.
 // Function uses a basic Modulo 27 operation to come up with the encrypted value.
 int DecryptData(int FileP, int KeyP, int ResultP)
 {

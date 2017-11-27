@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
 			memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer array
 
 			while (read(FileUpload, buffer, NET_READ_BUFFER) != 0){
-				buffer[strcspn(buffer, "\n")] = '\0'; // Remove the trailing \n that maybe in the file.
+				// buffer[strcspn(buffer, "\n")] = '\0'; // Remove the trailing \n that maybe in the file.
 				// Send message to server
 				charsWritten = send(socketFD, buffer, strlen(buffer), 0); // Write to the server
 				if (charsWritten < 0) error("CLIENT: ERROR writing to socket");

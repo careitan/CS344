@@ -133,18 +133,12 @@ int main(int argc, char* argv[])
 						}
 					}else if (strstr(buffer, "@@TERM@@") != NULL)
 					{ 
-						// Second Chance to detect the "@@TERM@@" string.
-						// DEBUG
-						//printf("SERVER: Current Value of charsRead is: %i\n",charsRead);
-						//printf("SERVER: I received this from the client: \"%s\"\n", buffer);
+						// Set the termination flag for the While Loop.
 						IsTerminated = true; 
 					}else
 					{
-					// write bytestream to the current file pointer.
-					// DEBUG
-					printf("SERVER: Current Value of charsRead is: %i\n",charsRead);
-					printf("SERVER: I received this from the client: \"%s\"\n", buffer);
-					write(CurrentFP, buffer, strlen(buffer));
+						// write bytestream to the current file pointer.
+						write(CurrentFP, buffer, strlen(buffer));
 					}
 				} // end if block for the RECV read and file write.
 
@@ -157,9 +151,6 @@ int main(int argc, char* argv[])
 				memset(buffer, '\0', NET_READ_BUFFER+1);
 				printf("SERVER: At End of While Loop, IsTerminated = %i\n", IsTerminated);
 			} // end of while loop.
-
-			// DEBUG
-			//printf("SERVER: The Current Value of charsRead (Outside While Loop) is: %i \n",charsRead);
 
 			// TODO: Create the Encrypted message text here.
 			memset(ResultFile, '\0', 32);
