@@ -20,3 +20,5 @@ int GetFileDescriptorRead(char* FileName);
 bool IsValidFileSet(char* FileName, char* KeyFile);
 void stripLeadingAndTrailingSpaces(char* string);
 void error(const char *msg);
+int EncryptData(int FileP, int KeyP);
+int DecryptData(int FileP, int KeyP);

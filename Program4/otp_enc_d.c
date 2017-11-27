@@ -16,12 +16,14 @@ typedef int bool;
 
 #include "Program4_lib.h"
 #include "dynamicArray.h"
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h> 
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 
 DynArr *Processes;
@@ -68,32 +70,121 @@ int main(int argc, char* argv[])
 			// TODO: Fork at this point and use a child process to handle the process of the file stream.
 
 			// setup to file descriptors for the files that we are going to write on the server side.
-			/*
-			int SourceFile; KeyFile;
+			
+			int SourceFP, KeyFP, CurrentFP;
 			char SourceFile[MAX_FILE_NAME];
 			char KeyFile[MAX_FILE_NAME];
-			SourceFile=-5; KeyFile=-5;
-*/
+			char ResultFile[32];
+			SourceFP=-5; KeyFP=-5;
+			
+			bool IsTerminated = false;
+			bool IsFilesValid = false;
 
-			// Get the message from the client and display it
-			memset(buffer, '\0', NET_READ_BUFFER+1);
+			memset(SourceFile, '\0', MAX_FILE_NAME);
+			memset(KeyFile, '\0', MAX_FILE_NAME);
 
-			// while(strcmp(buffer, "@@TERM@@") != 0){
-			while((charsRead = recv(establishedConnectionFD, buffer, NET_READ_BUFFER, 0)) > 0){
+			while(IsTerminated !=0)
+			{
+				// Peek ahead to see what type of message is coming in read
+				memset(buffer, '\0', NET_READ_BUFFER+1);
+				recv(establishedConnectionFD, buffer, MAX_FILE_NAME, MSG_PEEK);
+				if (strstr(buffer, "##") != NULL)
+				{
+					// Have a file name sent up for processing.
+					char* p = strtok(buffer, "#");
+					if(strlen(SourceFile)==0)
+					{
+						strcpy(SourceFile,p);
+					}else
+					{
+						strcpy(KeyFile,p);
+					}
+
+				}else if (strstr(buffer, "@@TERM@@") != NULL)
+				{ 
+					IsTerminated = true; 
+				}
+
 				// Read the client's message from the socket
-				// DEBUG
-				printf("SERVER: Current Value of charsRead is: %i\n",charsRead);
-				printf("SERVER: I received this from the client: \"%s\"\n", buffer);
-				
-				if (strcmp(buffer, "@@TERM@@") == 0){ charsRead = 0; break; }
+				memset(buffer, '\0', NET_READ_BUFFER+1);
+				if ((charsRead = recv(establishedConnectionFD, buffer, NET_READ_BUFFER, 0)) > 0)
+				{
+					if (strstr(buffer, "##") != NULL && SourceFP==-5)
+					{
+						// First one up is the SourceFile.
+						SourceFP=open(SourceFile, O_RDWR | O_CREAT | O_TRUNC, 0664);
+						if (SourceFP == -1)
+						{
+							fprintf(stderr, "SERVER: Unable to open the Source File for writing.\n");
+						}else
+						{
+							CurrentFP = SourceFP;
+						}
+					}else if (strstr(buffer, "##") != NULL)
+					{
+						// Second one up is the Key File.
+						KeyFP=open(KeyFile, O_RDWR | O_CREAT | O_TRUNC, 0664);
+						if (KeyFP == -1)
+						{
+							fprintf(stderr, "SERVER: Unable to open the Key File for writing.\n");
+						}else
+						{
+							CurrentFP = KeyFP;
+						}
+					}else if (strstr(buffer, "@@TERM@@") != NULL)
+					{ 
+						// Second Chance to detect the "@@TERM@@" string.
+						// DEBUG
+						//printf("SERVER: Current Value of charsRead is: %i\n",charsRead);
+						//printf("SERVER: I received this from the client: \"%s\"\n", buffer);
+						IsTerminated = true; 
+					}else
+					{
+					// write bytestream to the current file pointer.
+					// DEBUG
+					printf("SERVER: Current Value of charsRead is: %i\n",charsRead);
+					printf("SERVER: I received this from the client: \"%s\"\n", buffer);
+					write(CurrentFP, buffer, strlen(buffer));
+					}
+				} // end if block for the RECV read and file write.
+
+				if (charsRead < 0)
+				{
+					error("ERROR reading from socket");
+				}
 
 				// Setup for next iteration of loop
 				memset(buffer, '\0', NET_READ_BUFFER+1);
-			}
+				printf("SERVER: At End of While Loop, IsTerminated = %i\n", IsTerminated);
+			} // end of while loop.
 
-			if (charsRead < 0) error("ERROR reading from socket");
+			// DEBUG
+			//printf("SERVER: The Current Value of charsRead (Outside While Loop) is: %i \n",charsRead);
 
 			// TODO: Create the Encrypted message text here.
+			memset(ResultFile, '\0', 32);
+			strcpy(ResultFile, "Results");
+			int pidResult=0;
+			pidResult = getpid();
+			printf("SERVER: The Current Value of pidResult is : %i \n", pidResult);
+			strcat(ResultFile, integer_to_string(pidResult));
+			printf("SERVER: The Current Value of ResultFile is : %s \n", ResultFile);
+
+			// Reset the file pointer to the beginning of the file.
+			lseek(SourceFP, 0, SEEK_SET);
+			lseek(KeyFP, 0, SEEK_SET);
+
+			// DEBUG
+			printf("SERVER: The Current values of SourceFile, KeyFile : %s, %s ;\n", SourceFile, KeyFile);
+			IsFilesValid = IsValidFileSet(SourceFile, KeyFile);
+			if (IsFilesValid != 0) 
+			{ 
+				fprintf(stderr, "SERVER: ERROR Detected, Input Files are invalid.\n"); 
+				close(establishedConnectionFD); // Close the existing socket which is connected to the client
+
+				removeDynArr(Processes, establishedConnectionFD);
+				exit(0); 
+			}
 
 			// Send a Success message back to the client
 			// TODO: Replace this with the send return response back to client.
@@ -107,7 +198,8 @@ int main(int argc, char* argv[])
 			removeDynArr(Processes, establishedConnectionFD);
 			// TODO: End the fork process here for the client connect.
 
-		}else{
+		}else
+		{
 			printf("SERVER: Unable to establish a new connection at this time.\n");
 		}
 	}

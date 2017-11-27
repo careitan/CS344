@@ -167,8 +167,8 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
     fclose(KF);
 
     // DEBUG
-    printf("DEBUG Values, FNCount: %i; KFCount: %i \n", FNCount, KFCount);
-    printf("DEBUG Value of ReturnVal %i \n", ReturnVal);
+    // printf("DEBUG Values, FNCount: %i; KFCount: %i \n", FNCount, KFCount);
+    // printf("DEBUG Value of ReturnVal %i \n", ReturnVal);
 
     return ReturnVal;
 }
@@ -204,4 +204,120 @@ void error(const char *msg)
 {
     perror(msg); 
     exit(0); 
-} 
+}
+
+// Take two File Ptr and return the File pointer to the encrypted result file.
+// Based off of pattern algorithm that Lane Bryer displayed on his question asked on Pizza.
+// Adapted by Allan Reitan to use:
+// 1. file pointer instead of a char buffer array.
+// 2. Rearranged the Char Buffer to make index 0 a space.
+// Function uses a basic Modulo 27 operation to come up with the encrypted value.
+int EncryptData(int FileP, int KeyP, int ResultP)
+{
+	int ReturnVal = 0;
+	char SourceChar[1];
+	char KeyChar[1];
+	int PlainVal, KeyVal, EncryptedVal;
+
+	char chars[28] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+	memset(SourceChar,'\0',1);
+	memset(KeyChar,'\0',1);
+
+	// Setup the file pointers for the necessary work.
+	lseek(FileP,0,SEEK_SET);
+	lseek(KeyP,0,SEEK_SET);
+	lseek(ResultP,0,SEEK_SET);
+
+
+	while(read(FileP, SourceChar, 1) != EOF)
+	{
+		memset(KeyChar,'\0',1);
+		read(KeyP, KeyChar, 1);
+
+		// DEBUG
+		printf("SourceChar : %s  KeyChar : %s ;\t", SourceChar, KeyChar);
+
+		if (isspace(SourceChar[1]))
+		{
+			PlainVal = 0;
+		}else{
+			PlainVal =  SourceChar[1] - 64;		
+		}
+
+		if (isspace(KeyChar[1]))
+		{
+			KeyVal = 0;
+		}else{
+			KeyVal =  KeyChar[1] - 64;		
+		}
+
+		EncryptedVal = PlainVal + KeyVal;
+
+		while(EncryptedVal > 27) EncryptedVal -=27;
+
+		EncryptedVal %= 27;
+
+		ReturnVal += write(ResultP, &chars[EncryptedVal], 1);
+	}
+
+	return ReturnVal;
+}
+
+// Take two File Ptr and return the File pointer to the Decrypted result file.
+// Based off of pattern algorithm that Lane Bryer displayed on his question asked on Pizza.
+// Adapted by Allan Reitan to use:
+// 1. file pointer instead of a char buffer array.
+// 2. Rearranged the Char Buffer to make index 0 a space.
+// Function uses a basic Modulo 27 operation to come up with the encrypted value.
+int DecryptData(int FileP, int KeyP, int ResultP)
+{
+	int ReturnVal = 0;
+	char SourceChar[1];
+	char KeyChar[1];
+	int PlainVal, KeyVal, EncryptedVal;
+
+	char chars[28] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+	memset(SourceChar,'\0',1);
+	memset(KeyChar,'\0',1);
+
+	// Setup the file pointers for the necessary work.
+	lseek(FileP,0,SEEK_SET);
+	lseek(KeyP,0,SEEK_SET);
+	lseek(ResultP,0,SEEK_SET);
+
+	// FileP is the encrypted input and the ResultP will point to translated string.
+	while(read(FileP, SourceChar, 1) != EOF)
+	{
+		memset(KeyChar,'\0',1);
+		read(KeyP, KeyChar, 1);
+
+		// DEBUG
+		printf("SourceChar : %s  KeyChar : %s ;\t", SourceChar, KeyChar);
+
+		if (isspace(SourceChar[1]))
+		{
+			PlainVal = 0;
+		}else{
+			PlainVal =  SourceChar[1] - 64;		
+		}
+
+		if (isspace(KeyChar[1]))
+		{
+			KeyVal = 0;
+		}else{
+			KeyVal =  KeyChar[1] - 64;		
+		}
+
+		EncryptedVal = PlainVal + KeyVal;
+
+		while(EncryptedVal > 27) EncryptedVal -=27;
+
+		EncryptedVal %= 27;
+
+		ReturnVal += write(ResultP, &chars[EncryptedVal], 1);
+	}
+
+	return ReturnVal;
+}

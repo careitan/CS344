@@ -18,6 +18,7 @@ typedef int bool;
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -35,7 +36,7 @@ int main(int argc, char* argv[])
 	if (argc < 4) { fprintf(stderr,"USAGE: %s inputfile keyfile port\n", argv[0]); exit(0); } // Check usage & args
 
 	IsFilesValid = IsValidFileSet(argv[1], argv[2]);
-	if (IsFilesValid != 0) { fprintf(stderr, "ERROR Detected, Input Files area invalid.\n"); exit(0); }
+	if (IsFilesValid != 0) { fprintf(stderr, "ERROR Detected, Input Files are invalid.\n"); exit(0); }
 
 	// Set up the server address struct
 	memset((char*)&serverAddress, '\0', sizeof(serverAddress)); // Clear out the address struct
@@ -56,26 +57,13 @@ int main(int argc, char* argv[])
 		exit(2);
 	}
 
-	// Send up the File Names as Headers first
-	/*
-	memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer array
-	memset(filebuffer, '\0', sizeof(filebuffer)); // Clear out the buffer array
-	strcpy(filebuffer, argv[1]);
-	strcat(filebuffer, "_srv#srv_");
-	strcat(filebuffer, argv[2]);
-	strcpy(buffer, filebuffer);
-	charsWritten = send(socketFD, buffer, strlen(buffer), 0); // Write to the server
-	if (charsWritten < 0) error("CLIENT: ERROR writing to socket");
-	if (charsWritten < strlen(buffer)) printf("CLIENT: WARNING: Not all data (File Names) written to socket!\n");
-	*/
-
 	// loop through the two files to upload.
 	for (int i = 1; i < 3; ++i)
 	{			
 		// Send up the name of the file as starting Sentinel of the stream.
 		memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer array
 		memset(filebuffer, '\0', sizeof(filebuffer)); // Clear out the buffer array
-		strcpy(filebuffer, "##");
+		//strcpy(filebuffer, "##");
 		strcat(filebuffer, argv[i]);
 		strcat(filebuffer, "_srv##");
 		strcpy(buffer, filebuffer);
@@ -84,8 +72,8 @@ int main(int argc, char* argv[])
 		if (charsWritten < strlen(buffer)) printf("CLIENT: WARNING: Not all data (File Names) written to socket!\n");
 		sleep(1);
 
+		// Prepare file to be sent up as the stream
 		int FileUpload = GetFileDescriptorRead(argv[i]);
-
 		if (FileUpload > 0)
 		{
 			memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer array
@@ -103,13 +91,25 @@ int main(int argc, char* argv[])
 		}else{
 			fprintf(stderr, "Unable to access for upload: %s\n", argv[i]);
 		}
+
 		// Pause long enough to let the server process the last block that was sent up.
 		sleep(1);
 	}
 	
 	// Send Termination String to the Server
-	// sleep(1);
+	sleep(1);
 	send(socketFD, "@@TERM@@", strlen("@@TERM@@"), 0);
+
+	// Gap and wait for the send buffer to clear so that we know all data got up to the server before proceeding.
+	int checkSend = -5;  // Bytes remaining in send buffer
+	do
+	{
+	  ioctl(socketFD, TIOCOUTQ, &checkSend);  // Check the send buffer for this socket
+	  //printf("checkSend: %d\n", checkSend);  // Out of curiosity, check how many remaining bytes there are:
+	}
+	while (checkSend > 0);  // Loop forever until send buffer for this socket is empty
+	if (checkSend < 0)  // Check if we actually stopped the loop because of an error
+	  error("ioctl error");
 
 	// Get return message from server
 	memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer again for reuse
