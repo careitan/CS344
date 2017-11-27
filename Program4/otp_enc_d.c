@@ -57,6 +57,9 @@ int main(int argc, char* argv[])
 	listenSocketFD = socket(AF_INET, SOCK_STREAM, 0); // Create the socket
 	if (listenSocketFD < 0) error("ERROR opening socket");
 
+	// DEBUG - Research
+	// printf("SERVER: Value of serverAddress.sin_path is: %s\n", serverAddress.sin_path);
+
 	// Enable the socket to begin listening
 	if (bind(listenSocketFD, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) // Connect socket to port
 		error("ERROR on binding");
