@@ -180,6 +180,53 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
     return ReturnVal;
 }
 
+// Server side version of the IsValidFileSet function designed to take two char Arrays.
+bool IsValidFileSrvSet(char FileName[], char KeyFile[])
+{
+    assert (FileName != NULL && KeyFile != NULL);
+    bool ReturnVal = false;
+
+    int FNCount, KFCount;
+    FNCount = 0;
+    KFCount = 0;
+
+    // Count up the FileName string.
+    for (int i = 0; i < strlen(FileName); ++i)
+    {
+        if ((FileName[i] >= 'A' && FileName[i] <= 'Z') || isspace(FileName[i]))
+        {
+            if (FileName[i] != '\n') ++FNCount;
+        }else{
+            //fprintf(stderr, "Invalid Character detected in the Source file.\n");
+            return 1;
+        }
+    }
+
+    // Count up the KeyFile string.
+    for (int i = 0; i < strlen(KeyFile); ++i)
+    {
+        if ((KeyFile[i] >= 'A' && KeyFile[i] <= 'Z') || isspace(KeyFile[i]))
+        {
+            if (KeyFile[i] != '\n') ++KFCount;
+        }else{
+            //fprintf(stderr, "Invalid Character detected in the Key file.\n");
+            return 1;
+        }
+    }
+
+    ReturnVal = (FNCount <= KFCount)? 0 : 1;
+
+    if(ReturnVal == 1){
+    	fprintf(stderr, "Error: key file is too short\n");
+    }
+
+    // DEBUG
+    // printf("DEBUG Values, FNCount: %i; KFCount: %i \n", FNCount, KFCount);
+    // printf("DEBUG Value of ReturnVal %i \n", ReturnVal);
+
+    return ReturnVal;
+}
+
 // https://stackoverflow.com/questions/352055/best-algorithm-to-strip-leading-and-trailing-spaces-in-c
 void stripLeadingAndTrailingSpaces(char* string)
 {
@@ -271,6 +318,7 @@ int EncryptData(int FileP, int KeyP, int ResultP)
 				KeyVal =  KeyChar[0] - 64;		
 			}
 
+			// Perform the One Time Pad oeprations.
 			EncryptedVal = PlainVal + KeyVal;
 
 			while(EncryptedVal > 27) EncryptedVal -=27;
@@ -347,6 +395,7 @@ int DecryptData(int FileP, int KeyP, int ResultP)
 				KeyVal =  KeyChar[0] - 64;		
 			}
 
+			// Perform the One Time Pad oeprations.
 			EncryptedVal = PlainVal - KeyVal;
 
 			while(EncryptedVal < 0) EncryptedVal +=27;
@@ -360,6 +409,105 @@ int DecryptData(int FileP, int KeyP, int ResultP)
 
 	// Write a final Newline character to exit the function and terminate the string in the results value.
 	write(ResultP, "\n", 1);
+
+	return ReturnVal;
+}
+
+// Redesigning the functions to work with Buffer Arrays instead of files.
+int EncryptDataSrv(char FileP[], char KeyP[])
+{
+	assert(FileP != NULL && KeyP != NULL);
+	int ReturnVal = 0;
+	int PlainVal, KeyVal, EncryptedVal;
+
+	char chars[28] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+	for (int i = 0; i < strlen(FileP); ++i)
+	{
+		if (strcmp(&FileP[i], "\n") == 0)
+		{
+			ReturnVal++;
+			break;
+		}
+		else
+		{
+			// Process char
+
+			if (isspace(FileP[i]))
+			{
+				PlainVal = 0;
+			}else{
+				PlainVal =  FileP[i] - 64;		
+			}
+
+			if (isspace(KeyP[i]))
+			{
+				KeyVal = 0;
+			}else{
+				KeyVal =  KeyP[i] - 64;		
+			}
+
+			// Perform the One Time Pad oeprations.
+			EncryptedVal = PlainVal + KeyVal;
+
+			while(EncryptedVal > 27) EncryptedVal -=27;
+
+			EncryptedVal %= 27;
+
+			// Write the value back into the FileP Array
+			strncpy(&FileP[i], &chars[EncryptedVal], 1);
+			ReturnVal++;
+		}
+	}
+
+	return ReturnVal;
+}
+
+int DecryptDataSrv(char FileP[], char KeyP[])
+{
+	assert(FileP != NULL && KeyP != NULL);
+	int ReturnVal = 0;
+	int PlainVal, KeyVal, EncryptedVal;
+
+	char chars[28] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+	for (int i = 0; i < strlen(FileP); ++i)
+	{
+		if (strcmp(&FileP[i], "\n") == 0)
+		{
+			ReturnVal++;
+			break;
+		}
+		else
+		{
+			// Process char
+
+			if (isspace(FileP[i]))
+			{
+				PlainVal = 0;
+			}else{
+				PlainVal =  FileP[i] - 64;		
+			}
+
+			if (isspace(KeyP[i]))
+			{
+				KeyVal = 0;
+			}else{
+				KeyVal =  KeyP[i] - 64;		
+			}
+
+			// Perform the One Time Pad oeprations.
+			EncryptedVal = PlainVal - KeyVal;
+
+			while(EncryptedVal < 0) EncryptedVal +=27;
+
+			EncryptedVal %= 27;
+
+			// Write the value back into the FileP Array
+			strncpy(&FileP[i], &chars[EncryptedVal], 1);
+			ReturnVal++;
+		}
+	}
 
 	return ReturnVal;
 }
