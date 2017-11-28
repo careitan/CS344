@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
 	if (argc < 4) { fprintf(stderr,"USAGE: %s inputfile keyfile port\n", argv[0]); exit(0); } // Check usage & args
 
 	IsFilesValid = IsValidFileSet(argv[1], argv[2]);
-	if (IsFilesValid != 0) { fprintf(stderr, "otp_dec error: input contains bad characters\n"); exit(0); }
+	if (IsFilesValid != 0) { exit(0); }
 
 	// Set up the server address struct
 	memset((char*)&serverAddress, '\0', sizeof(serverAddress)); // Clear out the address struct
@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
 	}
 	
 	// Send Termination String to the Server
-	sleep(1);
+	// sleep(1);
 	send(socketFD, "@@TERM@@", strlen("@@TERM@@"), 0);
 
 	// Gap and wait for the send buffer to clear so that we know all data got up to the server before proceeding.

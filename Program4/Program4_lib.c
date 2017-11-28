@@ -164,6 +164,12 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
     }
 
     ReturnVal = (FNCount <= KFCount)? 0 : 1;
+
+    if(ReturnVal == 1){
+    	fprintf(stderr, "Error: key file is too short\n");
+    }
+
+
     fclose(FN);
     fclose(KF);
 
