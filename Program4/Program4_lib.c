@@ -136,14 +136,14 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
             {
                 if (ch != '\n') ++FNCount;
             }else{
-                fprintf(stderr, "Invalid Character detected in the Source file.\n");
+                //fprintf(stderr, "Invalid Character detected in the Source file.\n");
                 fclose(FN);
                 fclose(KF);
                 return 1;
             }
         }
     }else{
-        fprintf(stderr, "Failed to open the file for counting: %s\n", FileName);
+        fprintf(stderr, "Failed to open the Source file for counting: %s\n", FileName);
     }
 
     if (KF)
@@ -153,14 +153,14 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
             {
                 if (ch != '\n') ++KFCount;
             }else{
-                fprintf(stderr, "Invalid Character detected in the Key file.\n");
+                //fprintf(stderr, "Invalid Character detected in the Key file.\n");
                 fclose(FN);
                 fclose(KF);
                 return 1;
             }
         }
     }else{
-        fprintf(stderr, "Failed to open the file for counting: %s\n", KeyFile);
+        fprintf(stderr, "Failed to open the Key file for counting: %s\n", KeyFile);
     }
 
     ReturnVal = (FNCount <= KFCount)? 0 : 1;

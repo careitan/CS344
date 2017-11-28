@@ -93,12 +93,27 @@ int main(int argc, char* argv[])
 				SourceFP=-5; KeyFP=-5;
 				
 				bool IsTerminated = false;
+				bool IsConnTerminated = false;
 				bool IsFilesValid = false;
 
 				memset(SourceFile, '\0', MAX_FILE_NAME);
 				memset(KeyFile, '\0', MAX_FILE_NAME);
+				memset(buffer, '\0', NET_READ_BUFFER+1);
 
-				while(IsTerminated !=0)
+				// Check for the Sentinel value at start of the connection.
+				recv(establishedConnectionFD, buffer, MAX_FILE_NAME, MSG_PEEK);
+				if (strstr(buffer, "@@otp_enc@@") != NULL)
+				{
+					recv(establishedConnectionFD, buffer, strlen("@@otp_enc@@"), 0);
+					IsTerminated = false;
+					IsConnTerminated = false;
+				}else{
+					IsTerminated = true;
+					IsConnTerminated = true;
+					fprintf(stderr, "ERROR: invalid client contact otp_enc_d on port %i\n", portNumber);
+				}
+
+				while(IsTerminated !=0 && IsConnTerminated !=0)
 				{
 					// Peek ahead to see what type of message is coming in read
 					memset(buffer, '\0', NET_READ_BUFFER+1);
@@ -169,86 +184,97 @@ int main(int argc, char* argv[])
 					// printf("SERVER: At End of While Loop, IsTerminated = %i\n", IsTerminated);
 				} // end of while loop.
 
-				// Reset the file pointer to the beginning of the file.
-				lseek(SourceFP, 0, SEEK_SET);
-				lseek(KeyFP, 0, SEEK_SET);
-
-				// DEBUG
-				// printf("SERVER: The Current values of SourceFile, KeyFile : %s, %s ;\n", SourceFile, KeyFile);
-
-				IsFilesValid = IsValidFileSet(SourceFile, KeyFile);
-				if (IsFilesValid != 0) 
-				{ 
-					fprintf(stderr, "SERVER: ERROR Detected, Input Files are invalid.\n"); 
-					close(establishedConnectionFD); // Close the existing socket which is connected to the client
-
-					removeDynArr(Processes, establishedConnectionFD);
-					exit(0); 
-				}
-
-				// Setup for Creating the Encrypted File.
-
-				// Reset the file pointer to the beginning of the file.
-				lseek(SourceFP, 0, SEEK_SET);
-				lseek(KeyFP, 0, SEEK_SET);
-
-				// TODO: Create the Encrypted message text here.
-				memset(ResultFile, '\0', 32);
-				strcpy(ResultFile, "Results");
-				int pidResult=0;
-				pidResult = getpid();
-				strcat(ResultFile, integer_to_string(pidResult));
-				
-				// DEBUG
-				// printf("SERVER: The Current Value of ResultFile is : %s \n", ResultFile);
-
-				int ResultFP = open(ResultFile, O_RDWR | O_CREAT | O_TRUNC, 0664);
-				if (ResultFP == -1)
+				// Cutoff remainder of the processing if the IsConnTerminated Flag is True.
+				if (IsConnTerminated !=0)
 				{
-					fprintf(stderr, "SERVER: Unable to Open the Encrypt Results file: %s\n", ResultFile);
+					// Reset the file pointer to the beginning of the file.
+					lseek(SourceFP, 0, SEEK_SET);
+					lseek(KeyFP, 0, SEEK_SET);
+
+					// DEBUG
+					// printf("SERVER: The Current values of SourceFile, KeyFile : %s, %s ;\n", SourceFile, KeyFile);
+
+					IsFilesValid = IsValidFileSet(SourceFile, KeyFile);
+					if (IsFilesValid != 0) 
+					{ 
+						fprintf(stderr, "SERVER: ERROR Detected, Input Files are invalid.\n"); 
+						close(establishedConnectionFD); // Close the existing socket which is connected to the client
+
+						removeDynArr(Processes, establishedConnectionFD);
+						exit(0); 
+					}
+
+					// Setup for Creating the Encrypted File.
+
+					// Reset the file pointer to the beginning of the file.
+					lseek(SourceFP, 0, SEEK_SET);
+					lseek(KeyFP, 0, SEEK_SET);
+
+					// TODO: Create the Encrypted message text here.
+					memset(ResultFile, '\0', 32);
+					strcpy(ResultFile, "Results");
+					int pidResult=0;
+					pidResult = getpid();
+					strcat(ResultFile, integer_to_string(pidResult));
+					
+					// DEBUG
+					// printf("SERVER: The Current Value of ResultFile is : %s \n", ResultFile);
+
+					int ResultFP = open(ResultFile, O_RDWR | O_CREAT | O_TRUNC, 0664);
+					if (ResultFP == -1)
+					{
+						fprintf(stderr, "SERVER: Unable to Open the Encrypt Results file: %s\n", ResultFile);
+					}
+
+					// process the files creating the encrypted file.
+					int FileEncrypted = EncryptData(SourceFP, KeyFP, ResultFP);
+
+					if (FileEncrypted <= 0)
+					{
+						fprintf(stderr, "SERVER: Unable to Encrypt Results file, FileEncrypted = %i\n", FileEncrypted);
+					}
+
+					// Send a Success message back to the client
+					lseek(ResultFP, 0, SEEK_SET);
+					memset(buffer, '\0', NET_READ_BUFFER+1);
+
+					// TODO: Use this method to send back down the encrypted file that was created.
+					while (read(ResultFP, buffer, NET_READ_BUFFER) != 0){
+						charsRead = send(establishedConnectionFD, buffer, strlen(buffer), 0); // Send success back
+						if (charsRead < 0) error("SERVER: ERROR writing to socket");
+						if (charsRead < strlen(buffer)) printf("SERVER: WARNING: Not all data written to socket!\n");
+					}
+
+					// Gap and wait for the send buffer to clear so that we know all data got outbound from the server before proceeding.
+					int checkSend = -5;  // Bytes remaining in send buffer
+					do
+					{
+					  ioctl(establishedConnectionFD, TIOCOUTQ, &checkSend);  // Check the send buffer for this socket
+					  //printf("checkSend: %d\n", checkSend);  // Out of curiosity, check how many remaining bytes there are:
+					  sleep(2);
+					}
+					while (checkSend > 0);  // Loop forever until send buffer for this socket is empty
+					if (checkSend < 0)  // Check if we actually stopped the loop because of an error
+					  error("SERVER: ioctl error");
+
+					// Cleanoff the server of the artifacts.
+					close(SourceFP);
+					close(KeyFP);
+					close(ResultFP);
+
+					remove(SourceFile);
+					remove(KeyFile);
+					remove(ResultFile);
 				}
 
-				// process the files creating the encrypted file.
-				int FileEncrypted = EncryptData(SourceFP, KeyFP, ResultFP);
-
-				if (FileEncrypted <= 0)
+				if (IsConnTerminated==0)
 				{
-					fprintf(stderr, "SERVER: Unable to Encrypt Results file, FileEncrypted = %i\n", FileEncrypted);
-				}
-
-				// Send a Success message back to the client
-				lseek(ResultFP, 0, SEEK_SET);
-				memset(buffer, '\0', NET_READ_BUFFER+1);
-
-				// TODO: Use this method to send back down the encrypted file that was created.
-				while (read(ResultFP, buffer, NET_READ_BUFFER) != 0){
-					charsRead = send(establishedConnectionFD, buffer, strlen(buffer), 0); // Send success back
-					if (charsRead < 0) error("SERVER: ERROR writing to socket");
-					if (charsRead < strlen(buffer)) printf("SERVER: WARNING: Not all data written to socket!\n");
-				}
-
-				// Gap and wait for the send buffer to clear so that we know all data got outbound from the server before proceeding.
-				int checkSend = -5;  // Bytes remaining in send buffer
-				do
+					exit(1);
+				}else
 				{
-				  ioctl(establishedConnectionFD, TIOCOUTQ, &checkSend);  // Check the send buffer for this socket
-				  //printf("checkSend: %d\n", checkSend);  // Out of curiosity, check how many remaining bytes there are:
-				  sleep(2);
+					exit(0);
 				}
-				while (checkSend > 0);  // Loop forever until send buffer for this socket is empty
-				if (checkSend < 0)  // Check if we actually stopped the loop because of an error
-				  error("SERVER: ioctl error");
 
-				// Cleanoff the server of the artifacts.
-				close(SourceFP);
-				close(KeyFP);
-				close(ResultFP);
-
-				remove(SourceFile);
-				remove(KeyFile);
-				remove(ResultFile);
-
-				exit(0);
 				break;
 				default:
 					waitpid(ChildPid, &childExitStatus, 0);
