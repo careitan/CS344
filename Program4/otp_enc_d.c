@@ -22,6 +22,7 @@ typedef int bool;
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/types.h> 
@@ -41,6 +42,7 @@ int main(int argc, char* argv[])
 	socklen_t sizeOfClientInfo;
 	char buffer[NET_READ_BUFFER+1];
 	struct sockaddr_in serverAddress, clientAddress;
+	siginfo_t info;
 	
 	pid_t ChildPid = -5;
 	int childExitStatus = -5;
@@ -178,12 +180,14 @@ int main(int argc, char* argv[])
 							if (CurrentFP == SourceFP)
 							{
 								strcat(SourceArr, buffer);
-							}else
+							}else if(CurrentFP == KeyFP)
 							{
 								strcat(KeyArr, buffer);
+							}else
+							{
+								error("SERVER: Unable to copy buffer to either array.\n");
+								exit(1);
 							}
-
-							// write(CurrentFP, buffer, strlen(buffer));
 						}
 					} // end if block for the RECV read and file write.
 
@@ -202,14 +206,6 @@ int main(int argc, char* argv[])
 				// Cutoff remainder of the processing if the IsConnTerminated Flag is True.
 				if (IsConnTerminated !=0)
 				{
-					// Reset the file pointer to the beginning of the file.
-					// lseek(SourceFP, 0, SEEK_SET);
-					// lseek(KeyFP, 0, SEEK_SET);
-
-					// DEBUG
-					// printf("SERVER: The Current values of SourceFile, KeyFile : %s, %s ;\n", SourceFile, KeyFile);
-
-					// IsFilesValid = IsValidFileSet(SourceFile, KeyFile);
 					IsFilesValid = IsValidFileSrvSet(SourceArr, KeyArr);
 					if (IsFilesValid != 0) 
 					{ 
@@ -221,31 +217,6 @@ int main(int argc, char* argv[])
 					}
 
 					// Setup for Creating the Encrypted File.
-
-					// Reset the file pointer to the beginning of the file.
-					// lseek(SourceFP, 0, SEEK_SET);
-					// lseek(KeyFP, 0, SEEK_SET);
-
-					// TODO: Create the Encrypted message text here.
-
-					/*
-					memset(ResultFile, '\0', 32);
-					strcpy(ResultFile, "Results");
-					int pidResult=0;
-					pidResult = getpid();
-					strcat(ResultFile, integer_to_string(pidResult));
-					
-					// DEBUG
-					// printf("SERVER: The Current Value of ResultFile is : %s \n", ResultFile);
-
-					int ResultFP = open(ResultFile, O_RDWR | O_CREAT | O_TRUNC, 0664);
-					if (ResultFP == -1)
-					{
-						fprintf(stderr, "SERVER: Unable to Open the Encrypt Results file: %s\n", ResultFile);
-					}
-					*/
-					// process the files creating the encrypted file.
-					// int FileEncrypted = EncryptData(SourceFP, KeyFP, ResultFP);
 					int FileEncrypted=EncryptDataSrv(SourceArr, KeyArr);
 
 					if (FileEncrypted <= 0)
@@ -253,9 +224,6 @@ int main(int argc, char* argv[])
 						// fprintf(stderr, "SERVER: Unable to Encrypt Results file, FileEncrypted = %i\n", FileEncrypted);
 						fprintf(stderr, "SERVER: Unable to Encrypt Results.\n");
 					}
-
-					// Send a Success message back to the client
-					// lseek(ResultFP, 0, SEEK_SET);
 					
 					// TODO: Use this method to send back down the encrypted file that was created.
 					for (int i = 0; i < strlen(SourceArr); i = i+NET_READ_BUFFER)
@@ -267,13 +235,6 @@ int main(int argc, char* argv[])
 						if (charsRead < strlen(buffer)) printf("SERVER: WARNING: Not all data written to socket!\n");
 					}
 
-/*
-					while (read(ResultFP, buffer, NET_READ_BUFFER) != 0){
-						charsRead = send(establishedConnectionFD, buffer, strlen(buffer), 0); // Send success back
-						if (charsRead < 0) error("SERVER: ERROR writing to socket");
-						if (charsRead < strlen(buffer)) printf("SERVER: WARNING: Not all data written to socket!\n");
-					}
-*/					
 					// Gap and wait for the send buffer to clear so that we know all data got outbound from the server before proceeding.
 					int checkSend = -5;  // Bytes remaining in send buffer
 					do
@@ -306,7 +267,8 @@ int main(int argc, char* argv[])
 
 				break;
 				default:
-					waitpid(ChildPid, &childExitStatus, 0);
+					memset(&info, 0, sizeof(siginfo_t));
+					waitid(P_PID, ChildPid, &info, 0);
 
 					if  (WIFEXITED(childExitStatus) || WIFSIGNALED(childExitStatus))
 					{
@@ -318,15 +280,12 @@ int main(int argc, char* argv[])
 
 			} // end of Switch Statement
 
-			// TODO: End the fork process here for the client connect.
-
 		}else
 		{
 			printf("SERVER: Unable to establish a new connection at this time.\n");
 		}
 	}
 	
-	// TODO: Move this step up to the parent process.
 	close(listenSocketFD); // Close the listening socket
 	
 	return 0;

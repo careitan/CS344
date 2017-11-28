@@ -8,7 +8,8 @@
 #define _GNU_SOURCE
 
 #define NET_READ_BUFFER 2048
-#define MAX_FILE_NAME 256
+#define MAX_FILE_NAME 64
+#define MAX_ARRAY_SIZE 2048000
 
 typedef int bool;
 #define true  0
@@ -21,6 +22,7 @@ typedef int bool;
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/types.h> 
@@ -40,6 +42,7 @@ int main(int argc, char* argv[])
 	socklen_t sizeOfClientInfo;
 	char buffer[NET_READ_BUFFER+1];
 	struct sockaddr_in serverAddress, clientAddress;
+	siginfo_t info;
 	
 	pid_t ChildPid = -5;
 	int childExitStatus = -5;
@@ -90,6 +93,8 @@ int main(int argc, char* argv[])
 				int SourceFP, KeyFP, CurrentFP;
 				char SourceFile[MAX_FILE_NAME];
 				char KeyFile[MAX_FILE_NAME];
+				char SourceArr[MAX_ARRAY_SIZE];
+				char KeyArr[MAX_ARRAY_SIZE];
 				char ResultFile[32];
 				SourceFP=-5; KeyFP=-5;
 				
@@ -100,6 +105,9 @@ int main(int argc, char* argv[])
 				memset(SourceFile, '\0', MAX_FILE_NAME);
 				memset(KeyFile, '\0', MAX_FILE_NAME);
 				memset(buffer, '\0', NET_READ_BUFFER+1);
+
+				memset(SourceArr, '\0', MAX_ARRAY_SIZE);
+				memset(KeyArr, '\0', MAX_ARRAY_SIZE);
 
 				// Check for the Sentinel value at start of the connection.
 				recv(establishedConnectionFD, buffer, MAX_FILE_NAME, MSG_PEEK);
@@ -169,7 +177,17 @@ int main(int argc, char* argv[])
 						}else
 						{
 							// write bytestream to the current file pointer.
-							write(CurrentFP, buffer, strlen(buffer));
+							if (CurrentFP == SourceFP)
+							{
+								strcat(SourceArr, buffer);
+							}else if(CurrentFP == KeyFP)
+							{
+								strcat(KeyArr, buffer);
+							}else
+							{
+								error("SERVER: Unable to copy buffer to either array.\n");
+								exit(1);
+							}
 						}
 					} // end if block for the RECV read and file write.
 
@@ -188,14 +206,7 @@ int main(int argc, char* argv[])
 				// Cutoff remainder of the processing if the IsConnTerminated Flag is True.
 				if (IsConnTerminated !=0)
 				{
-					// Reset the file pointer to the beginning of the file.
-					lseek(SourceFP, 0, SEEK_SET);
-					lseek(KeyFP, 0, SEEK_SET);
-
-					// DEBUG
-					// printf("SERVER: The Current values of SourceFile, KeyFile : %s, %s ;\n", SourceFile, KeyFile);
-
-					IsFilesValid = IsValidFileSet(SourceFile, KeyFile);
+					IsFilesValid = IsValidFileSrvSet(SourceArr, KeyArr);
 					if (IsFilesValid != 0) 
 					{ 
 						fprintf(stderr, "SERVER: ERROR Detected, Input Files are invalid.\n"); 
@@ -206,41 +217,19 @@ int main(int argc, char* argv[])
 					}
 
 					// Setup for Creating the Encrypted File.
-
-					// Reset the file pointer to the beginning of the file.
-					lseek(SourceFP, 0, SEEK_SET);
-					lseek(KeyFP, 0, SEEK_SET);
-
-					// TODO: Create the Encrypted message text here.
-					memset(ResultFile, '\0', 32);
-					strcpy(ResultFile, "Results");
-					int pidResult=0;
-					pidResult = getpid();
-					strcat(ResultFile, integer_to_string(pidResult));
-					
-					// DEBUG
-					// printf("SERVER: The Current Value of ResultFile is : %s \n", ResultFile);
-
-					int ResultFP = open(ResultFile, O_RDWR | O_CREAT | O_TRUNC, 0664);
-					if (ResultFP == -1)
-					{
-						fprintf(stderr, "SERVER: Unable to Open the Encrypt Results file: %s\n", ResultFile);
-					}
-
-					// process the files creating the encrypted file.
-					int FileEncrypted = DecryptData(SourceFP, KeyFP, ResultFP);
+					int FileEncrypted=DecryptDataSrv(SourceArr, KeyArr);
 
 					if (FileEncrypted <= 0)
 					{
-						fprintf(stderr, "SERVER: Unable to Encrypt Results file, FileEncrypted = %i\n", FileEncrypted);
+						// fprintf(stderr, "SERVER: Unable to Encrypt Results file, FileEncrypted = %i\n", FileEncrypted);
+						fprintf(stderr, "SERVER: Unable to Encrypt Results.\n");
 					}
-
-					// Send a Success message back to the client
-					lseek(ResultFP, 0, SEEK_SET);
-					memset(buffer, '\0', NET_READ_BUFFER+1);
-
+					
 					// TODO: Use this method to send back down the encrypted file that was created.
-					while (read(ResultFP, buffer, NET_READ_BUFFER) != 0){
+					for (int i = 0; i < strlen(SourceArr); i = i+NET_READ_BUFFER)
+					{
+						memset(buffer, '\0', NET_READ_BUFFER+1);
+						strncpy(buffer, &SourceArr[i], NET_READ_BUFFER);
 						charsRead = send(establishedConnectionFD, buffer, strlen(buffer), 0); // Send success back
 						if (charsRead < 0) error("SERVER: ERROR writing to socket");
 						if (charsRead < strlen(buffer)) printf("SERVER: WARNING: Not all data written to socket!\n");
@@ -252,7 +241,7 @@ int main(int argc, char* argv[])
 					{
 					  ioctl(establishedConnectionFD, TIOCOUTQ, &checkSend);  // Check the send buffer for this socket
 					  //printf("checkSend: %d\n", checkSend);  // Out of curiosity, check how many remaining bytes there are:
-					  sleep(2);
+					  //sleep(1);
 					}
 					while (checkSend > 0);  // Loop forever until send buffer for this socket is empty
 					if (checkSend < 0)  // Check if we actually stopped the loop because of an error
@@ -261,7 +250,7 @@ int main(int argc, char* argv[])
 					// Cleanoff the server of the artifacts.
 					close(SourceFP);
 					close(KeyFP);
-					close(ResultFP);
+					// close(ResultFP);
 
 					remove(SourceFile);
 					remove(KeyFile);
@@ -278,7 +267,8 @@ int main(int argc, char* argv[])
 
 				break;
 				default:
-					waitpid(ChildPid, &childExitStatus, 0);
+					memset(&info, 0, sizeof(siginfo_t));
+					waitid(P_PID, ChildPid, &info, 0);
 
 					if  (WIFEXITED(childExitStatus) || WIFSIGNALED(childExitStatus))
 					{
@@ -290,15 +280,12 @@ int main(int argc, char* argv[])
 
 			} // end of Switch Statement
 
-			// TODO: End the fork process here for the client connect.
-
 		}else
 		{
 			printf("SERVER: Unable to establish a new connection at this time.\n");
 		}
 	}
 	
-	// TODO: Move this step up to the parent process.
 	close(listenSocketFD); // Close the listening socket
 	
 	return 0;

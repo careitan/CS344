@@ -136,7 +136,7 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
             {
                 if (ch != '\n') ++FNCount;
             }else{
-                //fprintf(stderr, "Invalid Character detected in the Source file.\n");
+                fprintf(stderr, "Invalid Character detected in file: %s\n", FileName);
                 fclose(FN);
                 fclose(KF);
                 return 1;
@@ -153,7 +153,7 @@ bool IsValidFileSet(char* FileName, char* KeyFile)
             {
                 if (ch != '\n') ++KFCount;
             }else{
-                //fprintf(stderr, "Invalid Character detected in the Key file.\n");
+                fprintf(stderr, "Invalid Character detected in file: %s\n", KeyFile);
                 fclose(FN);
                 fclose(KF);
                 return 1;
